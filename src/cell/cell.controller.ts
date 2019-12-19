@@ -7,9 +7,9 @@ export class CellController {
 
     @Get('live')
 
-    async loadLive() {
-        const cells = await this.cellService.findLive()
-        return { count: cells.length, cells }
+    async countLive() {
+        const count = await this.cellService.liveCount()
+        return count
     }
 
     @Get('test')

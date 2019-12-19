@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose'
 import { CellController } from './cell.controller';
 import { CellService } from './cell.service';
-import { CellSchema } from './schemas/cell.schema'
+import { LiveSchema } from './schemas/live.schema'
+import { DeadSchema } from './schemas/dead.schema'
 import { CkbModule } from 'src/ckb/ckb.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{name: 'Cell', schema: CellSchema}]),
+    MongooseModule.forFeature([{name: 'Live', schema: LiveSchema}]),
+    MongooseModule.forFeature([{name: 'Dead', schema: DeadSchema}]),
     CkbModule
   ],
   controllers: [CellController],
