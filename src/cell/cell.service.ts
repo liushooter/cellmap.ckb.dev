@@ -26,11 +26,8 @@ export class CellService {
       for (const input of tx.inputs) {
         const { previousOutput: { index, txHash } } = input
         const cid = `${txHash}+${index}`
-        let cell = await this.liveModel.findOneAndDelete({ cid })
-        console.log(cell)
-        cell = cell.toObject()
-        console.log(cell)
-        await this.deadModel.create(cell)
+        const cell = await this.liveModel.findOneAndDelete({ cid })
+        await this.deadModel.create(cell.toObject())
         // cell && console.log(`[ --- Cell Dead ] - [${cell.cid}]`)
       }
 
