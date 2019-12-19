@@ -35,8 +35,8 @@ export class CellService {
         const cid = `${tx.hash}+0x${index.toString(16)}`
         const size = output.capacity
         const type = output.type ? this.ckb.utils.scriptToHash(output.type) : ''
-        const cell = await this.liveModel.create({ cid, size, type })
-        console.log(`[ +++ Cell Live ] - [${cell.cid}]`)
+        await this.liveModel.create({ cid, size, type })
+        // console.log(`[ +++ Cell Live ] - [${cell.cid}]`)
       }
     }
   }
