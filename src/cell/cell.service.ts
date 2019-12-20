@@ -23,22 +23,27 @@ export class CellService {
     console.log(`========== BLOCK ${height} ==========`)
 
     for(const tx of block.transactions) {
-      for (const input of tx.inputs) {
-        const { previousOutput: { index, txHash } } = input
-        const cid = `${txHash}+${index}`
-        const cell = await this.liveModel.findOneAndDelete({ cid })
-        cell && await this.deadModel.create(cell.toObject())
-        // cell && console.log(`[ --- Cell Dead ] - [${cell.cid}]`)
-      }
-
-      for (const [index, output] of tx.outputs.entries()) {
-        const cid = `${tx.hash}+0x${index.toString(16)}`
-        const size = output.capacity
-        const type = output.type ? this.ckb.utils.scriptToHash(output.type) : ''
-        await this.liveModel.create({ cid, size, type })
-        // console.log(`[ +++ Cell Live ] - [${cell.cid}]`)
-      }
+      const inputs = tx.inputs.map(async(input) => this.kill(input))
+      const outputs = tx.outputs.map(async(output, index) => this.born(tx.hash, index, output))
+      await Promise.all([
+        await Promise.all(inputs),
+        await Promise.all(outputs)
+      ])
     }
+  }
+
+  async kill(input: CKBComponents.CellInput) {
+    const { previousOutput: { index, txHash } } = input
+    const cid = `${txHash}+${index}`
+    const cell = await this.liveModel.findOneAndDelete({ cid })
+    cell && await this.deadModel.create(cell.toObject())
+  }
+
+  async born(hash: CKBComponents.Hash, index: Number, output: CKBComponents.CellOutput) {
+    const cid = `${hash}+0x${index.toString(16)}`
+    const size = output.capacity
+    const type = output.type ? this.ckb.utils.scriptToHash(output.type) : ''
+    await this.liveModel.create({ cid, size, type })
   }
 
   async liveCount(): Promise<Number> {
