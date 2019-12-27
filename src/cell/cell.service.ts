@@ -4,7 +4,6 @@ import { Model } from 'mongoose';
 import { Live } from './interfaces/live.interface'
 import { Dead } from './interfaces/dead.interface'
 import { CkbService } from '../ckb/ckb.service'
-import { CreateCellDto } from './dto/create-cell.dto';
 
 @Injectable()
 export class CellService {
@@ -20,7 +19,7 @@ export class CellService {
 
     const block = await this.ckb.rpc.getBlockByNumber('0x' + height.toString(16))
 
-    console.log(`========== BLOCK ${height} ==========`)
+    console.log(`BLOCK ${height}`)
 
     for(const tx of block.transactions) {
       const inputs = tx.inputs.map(async(input) => this.kill(input))
@@ -43,7 +42,8 @@ export class CellService {
     const cid = `${hash}+0x${index.toString(16)}`
     const size = output.capacity
     const type = output.type ? this.ckb.utils.scriptToHash(output.type) : ''
-    await this.liveModel.create({ cid, size, type })
+    const lock = { code: output.lock.codeHash, args: output.lock.args }
+    await this.liveModel.create({ cid, size, type, lock })
   }
 
   async liveCount(): Promise<Number> {
