@@ -28,6 +28,7 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+
 ## Installation
 
 ```bash
@@ -58,6 +59,61 @@ $ npm run test:e2e
 
 # test coverage
 $ npm run test:cov
+```
+
+## Structure
+
+```
+./nest-app
+├── README.md
+├── nest-cli.json
+├── .gitignore
+├── .prettierrc
+├── nodemon.json
+├── package-lock.json
+├── package.json
+├── src  # 源码目录
+│   ├── block
+│       ├── dto
+│           ├── create-block.dto.ts
+│       ├── interfaces
+│           ├── block.interface.ts # block 接口
+│       ├── schemas
+│           ├── block.schema.ts
+│       ├── block.controller.spec.ts
+│       ├── block.controller.ts # 控制器类
+│       ├── block.module.ts # 模块
+│       ├── block.service.spec.ts
+│       ├── block.service.ts # 服务类
+│   ├── cell
+│       ├── dto
+│           ├── create-cell.dto.ts
+│       ├── interfaces
+│           ├── dead.interface.ts # dead cell 接口
+│           ├── live.interface.ts # live cell 接口
+│       ├── schemas
+│           ├── dead.schema.ts
+│           ├── live.schema.ts
+│       ├── cell.controller.spec.ts
+│       ├── cell.controller.ts # 控制器类
+│       ├── cell.module.ts # 模块
+│       ├── cell.service.spec.ts
+│       ├── cell.service.ts # 服务类
+│   ├── ckb
+│       ├── ckb.module.ts # 模块
+│       ├── ckb.service.spes.ts
+│       ├── ckb.service.ts # 服务类
+│   ├── app.controller.spec.ts
+│   ├── app.controller.ts # 控制器类
+│   ├── app.module.ts  # 模块
+│   ├── app.service.ts # 服务类
+│   └── main.ts   # 入口文件
+├── test   # 测试目录
+│   ├── app.e2e-spec.ts
+│   └── jest-e2e.json
+├── tsconfig.build.json
+├── tsconfig.json
+└── tslint.json
 ```
 
 ## Support
