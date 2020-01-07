@@ -227,11 +227,11 @@ export class CellService {
   ) {
     let selectPart = ' SELECT DISTINCT(`hash`), time FROM ';
     let inFromPart =
-      " SELECT DISTINCT(`hash`), time FROM cells WHERE lockId = '" +
+      " SELECT DISTINCT(`hash`), time FROM Cells WHERE lockId = '" +
       lockHash +
       "'";
     let outFromPart =
-      " SELECT DISTINCT(`cHash`) AS `hash`, ctime AS time FROM cells WHERE lockId = '" +
+      " SELECT DISTINCT(`cHash`) AS `hash`, ctime AS time FROM Cells WHERE lockId = '" +
       lockHash +
       "' AND isLive = 0";
     let orderPart = ` ORDER BY time DESC LIMIT ${limit} OFFSET ${offset}`;
