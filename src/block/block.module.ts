@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose'
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlockService } from './block.service'
 import { BlockController } from './block.controller';
-import { BlockSchema } from './schemas/block.schema'
+import { Block } from './block.entity'
 import { CellModule } from 'src/cell/cell.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: 'Block', schema: BlockSchema }]),
-    CellModule
-  ],
+  // imports: [
+  //   MongooseModule.forFeature([{ name: 'Block', schema: BlockSchema }]),
+  //   CellModule
+  // ],
+  imports: [TypeOrmModule.forFeature([Block]), CellModule],
   providers: [BlockService],
   exports: [BlockService],
   controllers: [BlockController]

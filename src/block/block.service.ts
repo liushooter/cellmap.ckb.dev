@@ -1,15 +1,18 @@
-import { Model } from 'mongoose'
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common'
-import { InjectModel } from '@nestjs/mongoose'
 import { Interval, NestSchedule } from 'nest-schedule'
-import { Block } from './interfaces/block.interface'
+import { Block } from './block.entity'
 import { CkbService } from '../ckb/ckb.service'
 import { CellService } from 'src/cell/cell.service'
 
 @Injectable()
 export class BlockService extends NestSchedule {
   constructor(
-    @InjectModel('Block') private readonly blockModel: Model<Block>,
+    // @InjectModel('Block') private readonly blockModel: Model<Block>,
+    @InjectRepository(Block)
+    private readonly blockModel: Repository<Block>,
+
     private readonly ckbService: CkbService,
     private readonly cellService: CellService
   ){ super() }
@@ -17,42 +20,58 @@ export class BlockService extends NestSchedule {
   private readonly ckb = this.ckbService.getCKB()
 
   private syncing = false
+  private syncingBlock = 0;
 
   @Interval(10 * 1000)
   async sync() {
     if (this.syncing) { 
-      console.log('Sync Skipped')
+      console.log('Sync Skipped', this.syncingBlock);
+      await this.updateTip(this.syncingBlock);
       return 
     }
 
     this.syncing = true
 
     const header = await this.ckb.rpc.getTipHeader()
-    const last = await this.update(header)
-    const block = await this.blockModel.findOne()
+    const currentTip = parseInt(header.number, 16);
+    const lastBlock = await this.blockModel.find();
+    const lastTip = lastBlock.length > 0?lastBlock[0].tip: -1;
 
-    for (let i = last.tip + 1; i <= block.tip; i++) {
+    // const { last, current:block } = await this.update(header)
+    // console.log('find one block is ', block);
+
+    for (let i = lastTip + 1; i <= currentTip; i++) {
+      // console.time("start extract block " + i)
       await this.cellService.extractFromBlock(i)
-      i === block.tip && console.log(`Synced from ${last.tip + 1} to ${block.tip}\n`)
+      // console.time("end extract block " + i)
+      this.syncingBlock = i;
+      i === currentTip && console.log(`Synced from ${lastTip + 1} to ${currentTip}\n`)
     }
 
+    await this.updateTip(currentTip);
     this.syncing = false
   }
 
-  async update(header: CKBComponents.BlockHeader): Promise<Block> {
+  async updateTip(tip: Number): Promise<any> {
 
-    const tip = parseInt(header.number, 16)
+    let blocks = await this.blockModel.find();
+    let block;
+    if(blocks.length > 0){
+      block = blocks[0];
+      block.tip = tip;
+      await this.blockModel.save(block);
+    }else{
+      block = new Block();
+      block.tip = tip;
+      await this.blockModel.save(block);
+    }
+    return { block }
 
-    const epochString = header.epoch.slice(2) // remove '0x'
-    const sn = parseInt(epochString.slice(-6), 16)
-    const idx = parseInt(epochString.slice(-10, -6), 16)
-    const len = parseInt(epochString.slice(-14, -10), 16)
-    const epoch = { sn, len, idx }
+  }
 
-    let block = await this.blockModel.findOneAndUpdate({}, { tip, epoch })
-    !block && (block = await this.blockModel.create({ tip: -1, epoch }))
-
-    return block
+  async getLastestBlock():Promise<Block>{
+    let blocks = await this.blockModel.find();
+    return blocks.length > 0? blocks[0]:null;
   }
 
   async getTipBlockHeader(): Promise<CKBComponents.BlockHeader> {

@@ -1,6 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { BlockService } from './block.service';
-import { Block } from './interfaces/block.interface';
+import { Block } from './block.entity';
 
 @Controller('block')
 export class BlockController {
@@ -9,8 +9,8 @@ export class BlockController {
   @Get('tip')
 
   async getTipBlockHeader(): Promise<Block> {
-    const header = await this.blockService.getTipBlockHeader() 
-    return await this.blockService.update(header)
+    // const header = await this.blockService.getTipBlockHeader() 
+    return await this.blockService.getLastestBlock();
   }
 
   @Get(':height')
