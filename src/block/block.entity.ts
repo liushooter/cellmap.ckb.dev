@@ -1,34 +1,45 @@
-import { Column, Entity, PrimaryGeneratedColumn} from 'typeorm';
+import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
 
-@Entity()
-export class Block {
-  @PrimaryGeneratedColumn()
+
+@Table
+export class Block extends Model<Block>{
+  @PrimaryKey
+  @AutoIncrement
+  @Column
   id: number;
 
-  @Column('int')
+  @Column(DataType.BIGINT)
   tip: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   sn: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   len: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   idx: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   cellCount: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   liveCount: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   addrCount: number;
 
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   lockCount: number;
   
-  @Column({type: 'int', default: 0})
+  @Default(0)
+  @Column(DataType.BIGINT)
   typeCount: number;
 }

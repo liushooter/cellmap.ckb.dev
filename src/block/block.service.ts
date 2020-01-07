@@ -1,6 +1,4 @@
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Interval, NestSchedule } from 'nest-schedule'
 import { Block } from './block.entity'
 import { CkbService } from '../ckb/ckb.service'
@@ -10,9 +8,10 @@ import { CellService } from 'src/cell/cell.service'
 export class BlockService extends NestSchedule {
   constructor(
     // @InjectModel('Block') private readonly blockModel: Model<Block>,
-    @InjectRepository(Block)
-    private readonly blockModel: Repository<Block>,
-
+    // @InjectRepository(Block)
+    // private readonly blockModel: Repository<Block>,
+    @Inject('BLOCKS_REPOSITORY') 
+    private readonly blockModel: typeof Block,
     private readonly ckbService: CkbService,
     private readonly cellService: CellService
   ){ super() }
@@ -34,7 +33,7 @@ export class BlockService extends NestSchedule {
 
     const header = await this.ckb.rpc.getTipHeader()
     const currentTip = parseInt(header.number, 16);
-    const lastBlock = await this.blockModel.find();
+    const lastBlock = await this.blockModel.findAll();
     const lastTip = lastBlock.length > 0?lastBlock[0].tip: -1;
 
     // const { last, current:block } = await this.update(header)
@@ -54,23 +53,25 @@ export class BlockService extends NestSchedule {
 
   async updateTip(tip: Number): Promise<any> {
 
-    let blocks = await this.blockModel.find();
+    let blocks = await this.blockModel.findAll();
     let block;
     if(blocks.length > 0){
       block = blocks[0];
       block.tip = tip;
-      await this.blockModel.save(block);
+      await block.save();
+      // await this.blockModel.save(block);
     }else{
       block = new Block();
       block.tip = tip;
-      await this.blockModel.save(block);
+      await block.save();
+      // await this.blockModel.save(block);
     }
     return { block }
 
   }
 
   async getLastestBlock():Promise<Block>{
-    let blocks = await this.blockModel.find();
+    let blocks = await this.blockModel.findAll();
     return blocks.length > 0? blocks[0]:null;
   }
 

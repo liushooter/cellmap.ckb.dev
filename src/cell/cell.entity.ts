@@ -1,71 +1,82 @@
-import { Column, Entity, PrimaryColumn, PrimaryGeneratedColumn, Index} from 'typeorm';
+import { Column, Model, Table, Index, PrimaryKey, DataType, Default} from 'sequelize-typescript';
+import { DECIMAL } from 'sequelize/types';
 
-@Entity()
-export class Cell{
-  @PrimaryColumn({type: 'char', length: 66})
+@Table
+export class Cell extends Model<Cell>{
+
+  @PrimaryKey
+  @Column(DataType.CHAR(66))
   hash: string
 
-  @PrimaryColumn()
+  @PrimaryKey
+  @Column
   idx: number 
 
-  @Column()
+  @Column
   blockNumebr: number
 
-  @Column()
+  @Column
   txIndex: number
 
-  @Column()
+  @Column
   cellbase: boolean
 
-  @Column("decimal", { precision: 60, scale: 0 })
+  @Column(DataType.DECIMAL(60, 0))
   size: number;
 
-  @Index()
-  @Column({type: 'char', length: 66})
+  @Index
+  @Column(DataType.CHAR(66))
   typeId: string;
 
-  @Column({type: 'char', length: 4, default: ''})
+  @Default('')
+  @Column(DataType.CHAR(4))
   typeType: string;
 
-  @Column({type: 'char', length: 66, default: ''})
+  @Default('')
+  @Column(DataType.CHAR(66))
   typeCode: string;
 
-  @Column({default: ''})
+  @Default('')
+  @Column
   typeArgs: string;
 
-  @Index()
-  @Column({type: 'char', length: 66})
+  @Index
+  @Column(DataType.CHAR(66))
   lockId: string;
 
-  @Column({type: 'char', length: 4})
+  @Column(DataType.CHAR(4))
   lockType: string;
 
-  @Column({type: 'char', length: 66})
+  @Column(DataType.CHAR(66))
   lockCode: string;
 
-  @Column()
+  @Column
   lockArgs: string;
 
-  @Column()
+  @Column
   dataLen: number;
 
-  @Column()
+  @Column
   isLive: boolean;
 
-  @Column({type: 'bigint'})
+  @Column(DataType.BIGINT)
   time: number;
 
-  @Index()
-  @Column({type: 'char', length: 66, default: ''})
+  @Index
+  @Default('')
+  @Column(DataType.CHAR(66))
   cHash: string
 
-  @Column({default: null})
+  @Default(null)
+  @Column
   cIdx: number
 
-  @Column({default: null})
+  @Default(null)
+  @Column
   cBlockNumber: number
 
-  @Column({type: 'bigint', default: null})
+  @Default(null)
+  @Column(DataType.BIGINT)
   cTime: number 
 
 }

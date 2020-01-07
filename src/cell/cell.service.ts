@@ -1,15 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { CkbService } from '../ckb/ckb.service';
 import { Cell } from './cell.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, In } from 'typeorm';
-import { AddressType, AddressPrefix} from '@nervosnetwork/ckb-sdk-utils'
+import { AddressType, AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
+import {Op, QueryTypes} from "sequelize";
+
 
 @Injectable()
 export class CellService {
   constructor(
-    @InjectRepository(Cell)
-    private readonly cellModel: Repository<Cell>,
+    // @InjectRepository(Cell)
+    // private readonly cellModel: Repository<Cell>,
+    @Inject('CELLS_REPOSITORY')
+    private readonly cellModel: typeof Cell,
     private readonly ckbService: CkbService,
   ) {}
 
@@ -72,8 +74,10 @@ export class CellService {
     const cid = `${txHash}+${index}`;
 
     const cell = await this.cellModel.findOne({
-      hash: txHash,
-      idx: Number(index),
+      where: {
+        hash: txHash,
+        idx: Number(index),
+      },
     });
     if (cell) {
       cell.isLive = false;
@@ -81,7 +85,7 @@ export class CellService {
       cell.cHash = cHash;
       cell.cBlockNumber = height.valueOf();
       cell.cTime = Number(this.ckb.utils.JSBI.BigInt(cTime).toString());
-      await this.cellModel.save(cell);
+      await cell.save();
     }
   }
 
@@ -119,18 +123,22 @@ export class CellService {
     cell.isLive = true;
     cell.cellbase = cellbase;
     cell.time = Number(this.ckb.utils.JSBI.BigInt(time).toString());
-    await this.cellModel.save(cell);
+    try {
+      await cell.save();
+    } catch (err) {
+      console.log('insert err', err);
+    }
   }
 
   async liveCount(): Promise<Number> {
-    return await this.cellModel.count({ isLive: true });
+    return await this.cellModel.count({ where: { isLive: true } });
   }
 
   async pickLiveCellForTransfer(
     lockHash: string,
     totalCapacity: string,
   ): Promise<Cell[]> {
-    const liveCells = await this.cellModel.find({
+    const liveCells = await this.cellModel.findAll({
       where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0 },
     });
 
@@ -202,54 +210,71 @@ export class CellService {
     limit: number,
     order?,
   ): Promise<Cell[]> {
-    const cells = await this.cellModel.find({
+    const cells = await this.cellModel.findAll({
       where: conditions,
-      skip: offset,
-      take: limit,
+      offset,
+      limit,
       order,
     });
     return cells;
   }
 
-  async loadTxByConditions(lockHash: string, direction: string, limit: number, offset: number) {
-
+  async loadTxByConditions(
+    lockHash: string,
+    direction: string,
+    limit: number,
+    offset: number,
+  ) {
     let selectPart = ' SELECT DISTINCT(`hash`), time FROM ';
-    let inFromPart = " SELECT DISTINCT(`hash`), time FROM cell WHERE lockId = '" +
+    let inFromPart =
+      " SELECT DISTINCT(`hash`), time FROM cells WHERE lockId = '" +
       lockHash +
-      "'" ;
-    let outFromPart = " SELECT DISTINCT(`cHash`) AS `hash`, ctime AS time FROM cell WHERE lockId = '" +
+      "'";
+    let outFromPart =
+      " SELECT DISTINCT(`cHash`) AS `hash`, ctime AS time FROM cells WHERE lockId = '" +
       lockHash +
       "' AND isLive = 0";
     let orderPart = ` ORDER BY time DESC LIMIT ${limit} OFFSET ${offset}`;
 
     let sql = '';
-    if(direction == 'in'){
+    if (direction == 'in') {
       sql = inFromPart + orderPart;
-    }else if(direction == 'out'){
+    } else if (direction == 'out') {
       sql = outFromPart + orderPart;
-    }else{
-      sql = selectPart + '(('+inFromPart+') UNION (' + outFromPart + ')) as TX ' + orderPart;  
+    } else {
+      sql =
+        selectPart +
+        '((' +
+        inFromPart +
+        ') UNION (' +
+        outFromPart +
+        ')) as TX ' +
+        orderPart;
     }
 
     console.log(sql);
 
-    const results = await this.cellModel.manager.query(sql);
-    // console.log('result', results.length);
+    const results = await this.cellModel.sequelize.query(sql, { type: QueryTypes.SELECT});
+    console.log('result', results.length);
 
     let fullTxs = [];
-
-    let txhashList = results.map(x => x.hash);
+    
+    let txhashList = results.map(x => x['hash']);
     console.log('txHashList',txhashList);
 
-    const allInputCells = await this.cellModel.find({
-      where: { cHash: In(txhashList) },
-    });
-    const allOutputCells = await this.cellModel.find({
-      where: { hash: In(txhashList) },
-    });
+    // let {In} = this.cellModel
+
+    const allInputCells = await this.cellModel.findAll({
+      where: { cHash: {[Op.in]: txhashList}} },
+    );
+    const allOutputCells = await this.cellModel.findAll({
+      where: { Hash: {[Op.in]: txhashList}} },
+    );
 
     for (let tx of results) {
-      let { hash, time } = tx;
+
+      let hash = tx['hash'];
+      let time = tx['time'];
       // console.log('tx', tx, hash, time);
       let txInputCells = allInputCells
         .filter(x => x.cHash === hash)
@@ -261,7 +286,6 @@ export class CellService {
 
       // console.log('input', txInputCells);
       // console.log('output', txOutputCells);
-
 
       let { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
 
@@ -287,7 +311,6 @@ export class CellService {
       let from = txInputCells.length > 0 ?this.getCellAddress(txInputCells[0]): 'cellbase';
       let to = this.getCellAddress(txOutputCells[0]);
 
-
       if (greaterThan(outAmount, inAmount)) {
         direction = 'in';
         amount = '0x' + subtract(outAmount, inAmount).toString(16);
@@ -301,21 +324,35 @@ export class CellService {
       fullTxs.push({ hash, time, from, to, amount, direction, inputSize, outputSize });
     }
     return fullTxs;
-
   }
 
-  getCellAddress(cell){
-
-    let {lockArgs, lockType, lockCode} = cell;
-    let type = lockType == 'type'?AddressType.TypeCodeHash: AddressType.DataCodeHash;
-    let prefix = this.ckbService.getChain() == 'ckb' ? AddressPrefix.Mainnet: AddressPrefix.Testnet;
+  getCellAddress(cell) {
+    let { lockArgs, lockType, lockCode } = cell;
+    let type =
+      lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
+    let prefix =
+      this.ckbService.getChain() == 'ckb'
+        ? AddressPrefix.Mainnet
+        : AddressPrefix.Testnet;
 
     // short address
-    if(lockCode === '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8' && lockType == 'type'){
-      return this.ckb.utils.bech32Address(lockArgs, { prefix, type: AddressType.HashIdx, codeHashOrCodeHashIndex: '0x00'});
+    if (
+      lockCode ===
+        '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8' &&
+      lockType == 'type'
+    ) {
+      return this.ckb.utils.bech32Address(lockArgs, {
+        prefix,
+        type: AddressType.HashIdx,
+        codeHashOrCodeHashIndex: '0x00',
+      });
     }
 
-    return this.ckb.utils.fullPayloadToAddress({arg: lockArgs, prefix, codeHash: lockCode, type});
-
+    return this.ckb.utils.fullPayloadToAddress({
+      arg: lockArgs,
+      prefix,
+      codeHash: lockCode,
+      type,
+    });
   }
 }
