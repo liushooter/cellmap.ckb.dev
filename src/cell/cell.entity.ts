@@ -1,19 +1,24 @@
-import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
+import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement } from 'sequelize-typescript';
 
-@Table
+@Table({indexes: [{unique: true, fields: ['hash', 'idx', 'direction']}]})
 export class Cell extends Model<Cell>{
 
   @PrimaryKey
+  @AutoIncrement
+  @Column
+  id: number
+
   @Column(DataType.CHAR(66))
   hash: string
 
-  @PrimaryKey
   @Column
   idx: number 
 
-  @PrimaryKey
   @Column
   direction: boolean
+
+  @Column
+  rId: number
 
   @Index
   @Column

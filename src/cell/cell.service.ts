@@ -79,9 +79,6 @@ export class CellService {
     });
 
     if (oldCell) {
-      oldCell.isLive = false;
-      await oldCell.save();
-
       const cell = new Cell();
       cell.blockNumber = height.valueOf();
       cell.txIndex = txIndex.valueOf();
@@ -102,8 +99,13 @@ export class CellService {
       cell.isLive = false;
       cell.cellbase = cellbase;
       cell.time = Number(this.ckb.utils.JSBI.BigInt(time).toString());
+      cell.rId = oldCell.id;
       try {
         await cell.save();
+
+        oldCell.isLive = false;
+        oldCell.rId = cell.id;
+        await oldCell.save();
       } catch (err) {
         console.log('insert err', err);
       }
@@ -250,8 +252,8 @@ export class CellService {
     let conditions = {
       lockId: lockHash,
       blockNumber: {
-        [Op.lte]: lastBlock
-      }
+        [Op.lte]: lastBlock,
+      },
     };
     if (direction == 'in') {
       conditions['direction'] = 1;
@@ -261,10 +263,10 @@ export class CellService {
     }
 
     const results = await this.cellModel.findAll({
-      attributes: [ 'hash', 'blockNumber'],
+      attributes: ['hash', 'blockNumber'],
       where: conditions,
       order: [['blockNumber', 'desc']],
-      limit
+      limit,
     });
 
     // console.log('result', results);
@@ -280,12 +282,12 @@ export class CellService {
 
     const allOutputCells = await this.cellModel.findAll({
       where: { hash: { [Op.in]: txhashList }, direction: true },
-      order: [['time', 'desc']]
+      order: [['time', 'desc']],
     });
 
     const allInputCells = await this.cellModel.findAll({
       where: { hash: { [Op.in]: txhashList }, direction: false },
-      order: [['time', 'desc']]
+      order: [['time', 'desc']],
     });
 
     // console.log('allOutputCells', allOutputCells.length);
@@ -391,5 +393,55 @@ export class CellService {
       codeHash: lockCode,
       type,
     });
+  }
+
+  async getDaoCells(lockHash) {
+    const daoTypeHash =
+      '0xcc77c4deac05d68ab5b26828f0bf4565a8d73113d7bb7e92b8362b8a74e58e58';
+
+    let cells = await this.cellModel.findAll({
+      where: {
+        // lockId: lockHash,
+        typeId: daoTypeHash,
+        isLive: true,
+      },
+      order: [['blockNumber', 'desc']],
+    });
+
+    let daoCells = [];
+    for (let cell of cells) {
+      let { hash, idx, size, lockId, blockNumber } = cell;
+      let type = 'deposit';
+      let depositBlockNumber = blockNumber;
+      let withdrawBlockNumber = null;
+
+      let depsoitCell = await this.cellModel.findOne({
+        where: {
+          hash,
+          idx,
+          lockId,
+          typeId: daoTypeHash,
+          direction: false,
+        },
+      });
+
+      if (depsoitCell) {
+        type = 'withdraw';
+        let dCell = await this.cellModel.findByPk(depsoitCell.rId);
+        depositBlockNumber = dCell.blockNumber;
+        withdrawBlockNumber = blockNumber;
+      }
+
+      daoCells.push({
+        hash,
+        idx,
+        size,
+        depositBlockNumber,
+        withdrawBlockNumber,
+        type,
+      });
+    }
+
+    return daoCells;
   }
 }

@@ -62,7 +62,7 @@ export class CellController {
     }
 
     @Get('loadDaoCell')
-    async getDaoCell(){
+    async loadDaoCell(){
         return await this.cellService.loadDaoCell();
     }
 
@@ -73,7 +73,7 @@ export class CellController {
 
     @Get('daoList')
     async getDaoList(@Query('lockHash') lockHash, @Query('type') type){
-        return '';
+        return await this.cellService.getDaoCells(lockHash);
     }
 
 }
