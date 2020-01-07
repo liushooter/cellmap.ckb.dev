@@ -43,7 +43,7 @@ export class BlockService extends NestSchedule {
     }
 
     // const { last, current:block } = await this.update(header)
-    // console.log('find one block is ', block);
+    console.log('find one block is ', lastTip);
 
     for (let i = lastTip + 1; i <= currentTip; i++) {
       // console.time("start extract block " + i)

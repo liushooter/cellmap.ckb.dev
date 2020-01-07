@@ -1,5 +1,4 @@
-import { Column, Model, Table, Index, PrimaryKey, DataType, Default} from 'sequelize-typescript';
-import { DECIMAL } from 'sequelize/types';
+import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
 
 @Table
 export class Cell extends Model<Cell>{
@@ -12,8 +11,13 @@ export class Cell extends Model<Cell>{
   @Column
   idx: number 
 
+  @PrimaryKey
   @Column
-  blockNumebr: number
+  direction: boolean
+
+  @Index
+  @Column
+  blockNumber: number
 
   @Column
   txIndex: number
@@ -61,22 +65,5 @@ export class Cell extends Model<Cell>{
 
   @Column(DataType.BIGINT)
   time: number;
-
-  @Index
-  @Default('')
-  @Column(DataType.CHAR(66))
-  cHash: string
-
-  @Default(null)
-  @Column
-  cIdx: number
-
-  @Default(null)
-  @Column
-  cBlockNumber: number
-
-  @Default(null)
-  @Column(DataType.BIGINT)
-  cTime: number 
 
 }

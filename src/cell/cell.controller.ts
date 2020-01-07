@@ -53,11 +53,10 @@ export class CellController {
     }
 
     @Get('txList')
-    async getTxList(@Query('lockHash') lockHash, @Query('page') page, @Query('size') size, @Query('type') type){
-        page = page > 1 ? page: 1;
-        size = size > 0 ? size : 20;
-        const offset = (page - 1) * size;
-        let cells = await this.cellService.loadTxByConditions(lockHash, type, size, offset);
+    async getTxList(@Query('lockHash') lockHash, @Query('lastBlock') lastBlock, @Query('size') size, @Query('type') type){
+        size = size > 0 ? parseInt(size) : 20;
+        lastBlock = lastBlock > 0 ? lastBlock: 999999999;
+        let cells = await this.cellService.loadTxByConditions(lockHash, type, size, lastBlock);
 
         return cells;
     }

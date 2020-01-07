@@ -2,8 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { CkbService } from '../ckb/ckb.service';
 import { Cell } from './cell.entity';
 import { AddressType, AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
-import {Op, QueryTypes} from "sequelize";
-
+import { Op, QueryTypes, fn, col } from 'sequelize';
 
 @Injectable()
 export class CellService {
@@ -31,15 +30,16 @@ export class CellService {
       const tx = block.transactions[i];
       const timestamp = block.header.timestamp;
 
-      const inputs = tx.inputs.map(async (input, index) =>
-        this.kill(height, input, tx.hash, index, timestamp),
-      );
-
-      // if(tx.inputs.length <= 0){
-      // }
       const cellbase =
         tx.inputs[0].previousOutput.txHash ==
         '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+      let inputs = [];
+      if (!cellbase) {
+        inputs = tx.inputs.map(async (input, index) =>
+          this.kill(height, i, cellbase, tx.hash, index, input, timestamp),
+        );
+      }
 
       const outputs = tx.outputs.map(async (output, index) =>
         this.born(
@@ -63,29 +63,50 @@ export class CellService {
 
   async kill(
     height: Number,
+    txIndex: Number,
+    cellbase: boolean,
+    hash: CKBComponents.Hash,
+    index: Number,
     input: CKBComponents.CellInput,
-    cHash: CKBComponents.Hash,
-    cIndex: Number,
-    cTime: string,
+    time,
   ) {
-    const {
-      previousOutput: { index, txHash },
-    } = input;
-    const cid = `${txHash}+${index}`;
-
-    const cell = await this.cellModel.findOne({
+    let oldCell = await this.cellModel.findOne({
       where: {
-        hash: txHash,
-        idx: Number(index),
+        hash: input.previousOutput.txHash,
+        idx: input.previousOutput.index.valueOf(),
+        direction: true,
       },
     });
-    if (cell) {
+
+    if (oldCell) {
+      oldCell.isLive = false;
+      await oldCell.save();
+
+      const cell = new Cell();
+      cell.blockNumber = height.valueOf();
+      cell.txIndex = txIndex.valueOf();
+      cell.hash = hash;
+      cell.idx = index.valueOf();
+      cell.direction = false;
+      cell.size = oldCell.size;
+      cell.typeId = oldCell.typeId;
+      cell.typeType = oldCell.typeType;
+      cell.typeArgs = oldCell.typeArgs;
+      cell.typeCode = oldCell.typeCode;
+
+      cell.lockId = oldCell.lockId;
+      cell.lockArgs = oldCell.lockArgs;
+      cell.lockCode = oldCell.lockCode;
+      cell.lockType = oldCell.lockType;
+      cell.dataLen = oldCell.dataLen;
       cell.isLive = false;
-      cell.cIdx = cIndex.valueOf();
-      cell.cHash = cHash;
-      cell.cBlockNumber = height.valueOf();
-      cell.cTime = Number(this.ckb.utils.JSBI.BigInt(cTime).toString());
-      await cell.save();
+      cell.cellbase = cellbase;
+      cell.time = Number(this.ckb.utils.JSBI.BigInt(time).toString());
+      try {
+        await cell.save();
+      } catch (err) {
+        console.log('insert err', err);
+      }
     }
   }
 
@@ -99,16 +120,16 @@ export class CellService {
     data: string,
     time: string,
   ) {
-    const cid = `${hash}+0x${index.toString(16)}`;
     const size = output.capacity;
     const type = output.type ? this.ckb.utils.scriptToHash(output.type) : '';
     const lock = { code: output.lock.codeHash, args: output.lock.args };
 
     const cell = new Cell();
-    cell.blockNumebr = height.valueOf();
+    cell.blockNumber = height.valueOf();
     cell.txIndex = txIndex.valueOf();
     cell.hash = hash;
     cell.idx = index.valueOf();
+    cell.direction = true;
     cell.size = Number(this.ckb.utils.JSBI.BigInt(size).toString());
     cell.typeId = type;
     cell.typeType = output.type?.hashType;
@@ -140,6 +161,7 @@ export class CellService {
   ): Promise<Cell[]> {
     const liveCells = await this.cellModel.findAll({
       where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0 },
+      limit: 100,
     });
 
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
@@ -169,10 +191,10 @@ export class CellService {
 
   async loadSecp256k1Cell() {
     const cell1 = await this.cellModel.findOne({
-      where: { blockNumebr: 0, txIndex: 1 },
+      where: { blockNumber: 0, txIndex: 1 },
     });
     const cell2 = await this.cellModel.findOne({
-      where: { blockNumebr: 0, txIndex: 0, idx: 1 },
+      where: { blockNumber: 0, txIndex: 0, idx: 1 },
     });
     return {
       hashType: 'type',
@@ -188,7 +210,7 @@ export class CellService {
     const daoCodeHash = '';
     const cell = await this.cellModel.findOne({
       where: {
-        blockNumebr: 0,
+        blockNumber: 0,
         txIndex: 0,
         idx: 2,
       },
@@ -223,69 +245,67 @@ export class CellService {
     lockHash: string,
     direction: string,
     limit: number,
-    offset: number,
+    lastBlock: number,
   ) {
-    let selectPart = ' SELECT DISTINCT(`hash`), time FROM ';
-    let inFromPart =
-      " SELECT DISTINCT(`hash`), time FROM Cells WHERE lockId = '" +
-      lockHash +
-      "'";
-    let outFromPart =
-      " SELECT DISTINCT(`cHash`) AS `hash`, ctime AS time FROM Cells WHERE lockId = '" +
-      lockHash +
-      "' AND isLive = 0";
-    let orderPart = ` ORDER BY time DESC LIMIT ${limit} OFFSET ${offset}`;
-
-    let sql = '';
+    let conditions = {
+      lockId: lockHash,
+      blockNumber: {
+        [Op.lte]: lastBlock
+      }
+    };
     if (direction == 'in') {
-      sql = inFromPart + orderPart;
+      conditions['direction'] = 1;
     } else if (direction == 'out') {
-      sql = outFromPart + orderPart;
+      conditions['direction'] = 0;
     } else {
-      sql =
-        selectPart +
-        '((' +
-        inFromPart +
-        ') UNION (' +
-        outFromPart +
-        ')) as TX ' +
-        orderPart;
     }
 
-    console.log(sql);
+    const results = await this.cellModel.findAll({
+      attributes: [ 'hash', 'blockNumber'],
+      where: conditions,
+      order: [['blockNumber', 'desc']],
+      limit
+    });
 
-    const results = await this.cellModel.sequelize.query(sql, { type: QueryTypes.SELECT});
-    console.log('result', results.length);
+    // console.log('result', results);
 
     let fullTxs = [];
-    
-    let txhashList = results.map(x => x['hash']);
-    console.log('txHashList',txhashList);
 
-    // let {In} = this.cellModel
+    let txhashList = results.map(x => {
+      let item = x.get({ plain: true });
+      return item['hash'];
+    });
+
+    console.log('txHashList', txhashList);
+
+    const allOutputCells = await this.cellModel.findAll({
+      where: { hash: { [Op.in]: txhashList }, direction: true },
+      order: [['time', 'desc']]
+    });
 
     const allInputCells = await this.cellModel.findAll({
-      where: { cHash: {[Op.in]: txhashList}} },
-    );
-    const allOutputCells = await this.cellModel.findAll({
-      where: { Hash: {[Op.in]: txhashList}} },
-    );
+      where: { hash: { [Op.in]: txhashList }, direction: false },
+      order: [['time', 'desc']]
+    });
+
+    // console.log('allOutputCells', allOutputCells.length);
 
     for (let tx of results) {
-
       let hash = tx['hash'];
-      let time = tx['time'];
+      // let time = tx['blockNumber'];
       // console.log('tx', tx, hash, time);
       let txInputCells = allInputCells
-        .filter(x => x.cHash === hash)
+        .filter(x => x.hash === hash)
         .sort((a, b) => a.idx - b.idx);
 
       let txOutputCells = allOutputCells
         .filter(x => x.hash === hash)
         .sort((a, b) => a.idx - b.idx);
 
-      // console.log('input', txInputCells);
-      // console.log('output', txOutputCells);
+      console.log('input', txInputCells.length);
+      console.log('output', txOutputCells.length);
+
+      let time = txOutputCells[0].time;
 
       let { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
 
@@ -308,8 +328,15 @@ export class CellService {
       let inputSize = txInputCells.length;
       let outputSize = txOutputCells.length;
 
-      let from = txInputCells.length > 0 ?this.getCellAddress(txInputCells[0]): 'cellbase';
+      console.log('txInputCells', txInputCells.length);
+      console.log('txOutputCells', txOutputCells.length);
+      let from =
+        txInputCells.length > 0
+          ? this.getCellAddress(txInputCells[0])
+          : 'cellbase';
       let to = this.getCellAddress(txOutputCells[0]);
+
+      let blockNumber = txOutputCells[0].blockNumber;
 
       if (greaterThan(outAmount, inAmount)) {
         direction = 'in';
@@ -319,9 +346,19 @@ export class CellService {
         amount = '0x' + subtract(inAmount, outAmount).toString(16);
       }
 
-      console.log( from, '-------------', to, '-----', amount );
+      console.log(from, '-------------', to, '-----', amount);
 
-      fullTxs.push({ hash, time, from, to, amount, direction, inputSize, outputSize });
+      fullTxs.push({
+        hash,
+        time,
+        from,
+        to,
+        amount,
+        direction,
+        blockNumber,
+        inputSize,
+        outputSize,
+      });
     }
     return fullTxs;
   }
