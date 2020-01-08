@@ -70,12 +70,15 @@ export class CellService {
     input: CKBComponents.CellInput,
     time,
   ) {
-    let oldCell = await this.cellModel.findOne({
-      where: {
+    let oldWhere = {
         hash: input.previousOutput.txHash,
-        idx: input.previousOutput.index.valueOf(),
+        idx: Number(input.previousOutput.index).valueOf(),
         direction: true,
-      },
+      };
+
+      // console.log('oldWhere', oldWhere);
+    let oldCell = await this.cellModel.findOne({
+      where: oldWhere,
     });
 
     if (oldCell) {
@@ -162,7 +165,7 @@ export class CellService {
     totalCapacity: string,
   ): Promise<Cell[]> {
     const liveCells = await this.cellModel.findAll({
-      where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0 },
+      where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0, direction: 1 },
       order: [['blockNumber', 'asc']],
       limit: 100,
     });
