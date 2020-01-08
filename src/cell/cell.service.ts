@@ -163,6 +163,7 @@ export class CellService {
   ): Promise<Cell[]> {
     const liveCells = await this.cellModel.findAll({
       where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0 },
+      order: [['blockNumber', 'asc']],
       limit: 100,
     });
 
