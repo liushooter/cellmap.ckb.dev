@@ -1,34 +1,49 @@
-import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement } from 'sequelize-typescript';
+import {
+  Column,
+  Model,
+  Table,
+  Index,
+  PrimaryKey,
+  DataType,
+  Default,
+  AutoIncrement,
+} from 'sequelize-typescript';
 
-@Table({indexes: [{unique: true, fields: ['hash', 'idx', 'direction']}]})
-export class Cell extends Model<Cell>{
-
+@Table({
+  indexes: [
+    { unique: true, fields: ['hash', 'idx', 'direction'] },
+    { fields: ['typeId'] },
+    { fields: ['lockId'] },
+    { fields: ['blockNumber'] },
+  ],
+})
+export class Cell extends Model<Cell> {
   @PrimaryKey
   @AutoIncrement
   @Column
-  id: number
+  id: number;
 
   @Column(DataType.CHAR(66))
-  hash: string
+  hash: string;
 
   @Column
-  idx: number 
+  idx: number;
 
   @Column
-  direction: boolean
+  direction: boolean;
 
   @Column
-  rId: number
+  rId: number;
 
   @Index
   @Column
-  blockNumber: number
+  blockNumber: number;
 
   @Column
-  txIndex: number
+  txIndex: number;
 
   @Column
-  cellbase: boolean
+  cellbase: boolean;
 
   @Column(DataType.DECIMAL(60, 0))
   size: number;
@@ -70,5 +85,4 @@ export class Cell extends Model<Cell>{
 
   @Column(DataType.BIGINT)
   time: number;
-
 }

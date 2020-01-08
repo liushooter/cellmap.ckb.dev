@@ -1,7 +1,8 @@
 import { Sequelize } from 'sequelize-typescript';
 // import { Cat } from '../cats/cat.entity';
-import {Block} from '../block/block.entity'
+import {Block} from '../cell/block.entity'
 import {Cell} from '../cell/cell.entity'
+import { SyncStat } from 'src/block/syncstat.entity';
 
 export const databaseProviders = [
   {
@@ -14,9 +15,9 @@ export const databaseProviders = [
         username: 'root',
         password: 'abc321456',
         database: 'ckb_test_1',
-        logging: false
+        logging: true
       });
-      sequelize.addModels([Cell, Block]);
+      sequelize.addModels([Cell, Block, SyncStat]);
       await sequelize.sync({force: false});
       return sequelize;
     },

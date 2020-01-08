@@ -1,15 +1,16 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { CkbService } from '../ckb/ckb.service';
 import { Cell } from './cell.entity';
-import { AddressType, AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
-import { Op, QueryTypes, fn, col } from 'sequelize';
+import { AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
+import { Op, fn, col} from 'sequelize';
+import { Block } from './block.entity';
+import { CELLS_REPOSITORY, EMPTY_HASH } from '../util/constant';
+import { getCellAddress, uniqArray } from '../util/helper';
 
 @Injectable()
 export class CellService {
   constructor(
-    // @InjectRepository(Cell)
-    // private readonly cellModel: Repository<Cell>,
-    @Inject('CELLS_REPOSITORY')
+    @Inject(CELLS_REPOSITORY)
     private readonly cellModel: typeof Cell,
     private readonly ckbService: CkbService,
   ) {}
@@ -17,22 +18,17 @@ export class CellService {
   private readonly ckb = this.ckbService.getCKB();
 
   async extractFromBlock(height: Number) {
-    // console.time("process block" + height)
     const block = await this.ckb.rpc.getBlockByNumber(
       '0x' + height.toString(16),
     );
 
-    // console.timeLog("process block" + height)
-
-    // console.log(`BLOCK ${height}`)
+    await this.saveBlockHeader(block.header, block.transactions.length);
 
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       const timestamp = block.header.timestamp;
 
-      const cellbase =
-        tx.inputs[0].previousOutput.txHash ==
-        '0x0000000000000000000000000000000000000000000000000000000000000000';
+      const cellbase = tx.inputs[0].previousOutput.txHash == EMPTY_HASH;
 
       let inputs = [];
       if (!cellbase) {
@@ -58,7 +54,27 @@ export class CellService {
         await Promise.all(outputs),
       ]);
     }
-    // console.timeEnd("process block" + height)
+  }
+
+  async saveBlockHeader(header: CKBComponents.BlockHeader, txCount: number) {
+    const block = new Block();
+
+    block.number = Number(header.number);
+    let epoch = this.ckb.utils.parseEpoch(header.epoch);
+    block.epochNumber = Number(epoch.number);
+    block.epochIndex = Number(epoch.index);
+    block.epochLength = Number(epoch.length);
+
+    block.hash = header.hash;
+    block.timestamp = Number(header.timestamp);
+
+    block.dao = header.dao;
+    block.transactionCount = txCount;
+    try {
+      await block.save();
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   async kill(
@@ -179,9 +195,7 @@ export class CellService {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
     const costCapacity = BigInt(totalCapacity);
-
     let inputCapacity = BigInt(0);
-
     let selectedCells = [];
 
     for (let i = 0; i < liveCells.length; i++) {
@@ -195,7 +209,7 @@ export class CellService {
     }
 
     if (lessThan(inputCapacity, costCapacity)) {
-      throw new Error('Input capacity is not enough');
+      throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
     }
 
     return selectedCells;
@@ -297,12 +311,11 @@ export class CellService {
     }
 
     const results = await this.cellModel.findAll({
-      attributes: ['hash', 'blockNumber'],
+      attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'id'],
       where: conditions,
-      order: [['blockNumber', 'desc']],
+      order: [['id', 'desc']],
       limit,
     });
-
     // console.log('result', results);
 
     let fullTxs = [];
@@ -311,6 +324,12 @@ export class CellService {
       let item = x.get({ plain: true });
       return item['hash'];
     });
+
+    if(txhashList.length === 0){
+      return [];
+    }
+
+    txhashList = uniqArray(txhashList);
 
     console.log('txHashList', txhashList);
 
@@ -326,8 +345,8 @@ export class CellService {
 
     // console.log('allOutputCells', allOutputCells.length);
 
-    for (let tx of results) {
-      let hash = tx['hash'];
+    for (let hash of txhashList) {
+      // let hash = tx['hash'];
       // let time = tx['blockNumber'];
       // console.log('tx', tx, hash, time);
       let txInputCells = allInputCells
@@ -366,11 +385,18 @@ export class CellService {
 
       console.log('txInputCells', txInputCells.length);
       console.log('txOutputCells', txOutputCells.length);
+
+
+    let prefix =
+      this.ckbService.getChain() == 'ckb'
+        ? AddressPrefix.Mainnet
+        : AddressPrefix.Testnet;
+
       let from =
         txInputCells.length > 0
-          ? this.getCellAddress(txInputCells[0])
+          ? getCellAddress(txInputCells[0], prefix)
           : 'cellbase';
-      let to = this.getCellAddress(txOutputCells[0]);
+      let to = getCellAddress(txOutputCells[0], prefix);
 
       let blockNumber = txOutputCells[0].blockNumber;
 
@@ -399,35 +425,6 @@ export class CellService {
     return fullTxs;
   }
 
-  getCellAddress(cell) {
-    let { lockArgs, lockType, lockCode } = cell;
-    let type =
-      lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
-    let prefix =
-      this.ckbService.getChain() == 'ckb'
-        ? AddressPrefix.Mainnet
-        : AddressPrefix.Testnet;
-
-    // short address
-    if (
-      lockCode ===
-        '0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8' &&
-      lockType == 'type'
-    ) {
-      return this.ckb.utils.bech32Address(lockArgs, {
-        prefix,
-        type: AddressType.HashIdx,
-        codeHashOrCodeHashIndex: '0x00',
-      });
-    }
-
-    return this.ckb.utils.fullPayloadToAddress({
-      arg: lockArgs,
-      prefix,
-      codeHash: lockCode,
-      type,
-    });
-  }
 
   async getCapacityByLockHash(lockHash) {
     let capacity = await this.cellModel.sum('size', {
@@ -436,53 +433,5 @@ export class CellService {
     return '0x' + capacity.toString(16);
   }
 
-  async getDaoCells(lockHash) {
-    const daoTypeHash =
-      '0xcc77c4deac05d68ab5b26828f0bf4565a8d73113d7bb7e92b8362b8a74e58e58';
 
-    let cells = await this.cellModel.findAll({
-      where: {
-        // lockId: lockHash,
-        typeId: daoTypeHash,
-        isLive: true,
-      },
-      order: [['blockNumber', 'desc']],
-    });
-
-    let daoCells = [];
-    for (let cell of cells) {
-      let { hash, idx, size, lockId, blockNumber } = cell;
-      let type = 'deposit';
-      let depositBlockNumber = blockNumber;
-      let withdrawBlockNumber = null;
-
-      let depsoitCell = await this.cellModel.findOne({
-        where: {
-          hash,
-          idx,
-          lockId,
-          typeId: daoTypeHash,
-          direction: false,
-        },
-      });
-
-      if (depsoitCell) {
-        type = 'withdraw';
-        let dCell = await this.cellModel.findByPk(depsoitCell.rId);
-        depositBlockNumber = dCell.blockNumber;
-        withdrawBlockNumber = blockNumber;
-      }
-
-      daoCells.push({
-        hash,
-        idx,
-        size,
-        depositBlockNumber,
-        withdrawBlockNumber,
-        type,
-      });
-    }
-
-    return daoCells;
-  }
 }

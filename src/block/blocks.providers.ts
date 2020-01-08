@@ -1,8 +1,9 @@
-import { Block } from './block.entity';
+import { SyncStat } from './syncstat.entity';
+import {SYNCSTAT_REPOSITORY} from '../util/constant'
 
 export const blocksProviders = [
   {
-    provide: 'BLOCKS_REPOSITORY',
-    useValue: Block,
+    provide: SYNCSTAT_REPOSITORY,
+    useValue: SyncStat,
   },
 ];

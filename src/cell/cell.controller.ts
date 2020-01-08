@@ -1,7 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { CellService } from './cell.service';
-import { CLIENT_RENEG_LIMIT } from 'tls';
-import { type } from 'os';
+import { ETH_LOCK_CODE, ETH_TX_HASH, EMPTY_HASH } from 'src/util/constant';
 
 @Controller('cell')
 export class CellController {
@@ -52,8 +51,8 @@ export class CellController {
               args: cell.typeArgs,
             };
 
-      const dataHash =
-        '0x0000000000000000000000000000000000000000000000000000000000000000';
+      const dataHash = EMPTY_HASH;
+        
       const status = 'live';
       return {
         blockHash,
@@ -101,22 +100,14 @@ export class CellController {
 
   @Get('getConfig')
   async getConfig() {
-    let keccak_code_hash =
-      '0x966e7bf34d4f6dc7ea18c0f86fe9ced504fad7565b47f8c3e168d2e48b1e2970';
-    let keccak_tx_hash =
-      '0xee768786e221da161b25bf60c1f1eb5457d61acb1c6457e602d900b02ad61733';
+    let keccak_code_hash = ETH_LOCK_CODE;
+    let keccak_tx_hash = ETH_TX_HASH;
     let cellDeps = await this.cellService.getEthDeps(keccak_tx_hash);
     return {
       keccak_code_hash,
       keccak_tx_hash,
       cellDeps,
     };
-  }
-
-  @Get('daoList')
-  async getDaoList(@Query('lockHash') lockHash, @Query('type') type) {
-      
-    return await this.cellService.getDaoCells(lockHash);
   }
 
   @Get('getCapacityByLockHash')

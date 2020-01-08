@@ -1,6 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { BlockService } from './block.service';
-import { Block } from './block.entity';
+import { SyncStat } from './syncstat.entity';
 
 @Controller('block')
 export class BlockController {
@@ -8,7 +8,7 @@ export class BlockController {
 
   @Get('tip')
 
-  async getTipBlockHeader(): Promise<Block> {
+  async getTipBlockHeader(): Promise<SyncStat> {
     // const header = await this.blockService.getTipBlockHeader() 
     return await this.blockService.getLastestBlock();
   }
