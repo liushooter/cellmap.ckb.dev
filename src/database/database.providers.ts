@@ -13,7 +13,7 @@ export const databaseProviders = [
         port: 3306,
         username: 'root',
         password: 'abc321456',
-        database: 'ckb_test',
+        database: 'ckb_test_1',
         logging: false
       });
       sequelize.addModels([Cell, Block]);

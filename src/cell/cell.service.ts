@@ -71,12 +71,12 @@ export class CellService {
     time,
   ) {
     let oldWhere = {
-        hash: input.previousOutput.txHash,
-        idx: Number(input.previousOutput.index).valueOf(),
-        direction: true,
-      };
+      hash: input.previousOutput.txHash,
+      idx: Number(input.previousOutput.index).valueOf(),
+      direction: true,
+    };
 
-      // console.log('oldWhere', oldWhere);
+    // console.log('oldWhere', oldWhere);
     let oldCell = await this.cellModel.findOne({
       where: oldWhere,
     });
@@ -165,7 +165,13 @@ export class CellService {
     totalCapacity: string,
   ): Promise<Cell[]> {
     const liveCells = await this.cellModel.findAll({
-      where: { lockId: lockHash, isLive: true, typeId: '', dataLen: 0, direction: 1 },
+      where: {
+        lockId: lockHash,
+        isLive: true,
+        typeId: '',
+        dataLen: 0,
+        direction: 1,
+      },
       order: [['blockNumber', 'asc']],
       limit: 100,
     });
@@ -193,6 +199,30 @@ export class CellService {
     }
 
     return selectedCells;
+  }
+
+  async getEthDeps(keccak_tx_hash) {
+    const cell = await this.cellModel.findOne({
+      where: { blockNumber: 0, txIndex: 0, idx: 1 },
+    });
+
+    let deps = [
+      {
+        depType: 'code',
+        outPoint: {
+          txHash: cell.hash,
+          index: '0x3',
+        },
+      },
+      {
+        depType: 'code',
+        outPoint: {
+          txHash: keccak_tx_hash,
+          index: '0x0',
+        },
+      },
+    ];
+    return deps;
   }
 
   async loadSecp256k1Cell() {
@@ -397,6 +427,13 @@ export class CellService {
       codeHash: lockCode,
       type,
     });
+  }
+
+  async getCapacityByLockHash(lockHash) {
+    let capacity = await this.cellModel.sum('size', {
+      where: { lockId: lockHash, isLive: true, direction: true },
+    });
+    return '0x' + capacity.toString(16);
   }
 
   async getDaoCells(lockHash) {
