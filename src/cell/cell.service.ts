@@ -370,7 +370,7 @@ export class CellService {
         if (
         (direction == 'in' && tx.direction == 'in') ||
         (direction == 'out' && tx.direction == 'out') ||
-        !direction
+        (direction != 'in' && direction != 'out')
         ) {
           fullTxs.push(tx);
         } 
