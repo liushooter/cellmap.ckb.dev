@@ -356,12 +356,12 @@ export class CellService {
 
       const allOutputCells = await this.cellModel.findAll({
         where: { hash: { [Op.in]: txhashList }, direction: true },
-        order: [['time', 'desc']],
+        order: [['id', 'desc']],
       });
 
       const allInputCells = await this.cellModel.findAll({
         where: { hash: { [Op.in]: txhashList }, direction: false },
-        order: [['time', 'desc']],
+        order: [['id', 'desc']],
       });
 
       for (let hash of txhashList) {
