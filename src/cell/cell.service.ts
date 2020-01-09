@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { CkbService } from '../ckb/ckb.service';
 import { Cell } from './cell.entity';
 import { AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
-import { Op, fn, col} from 'sequelize';
+import { Op, fn, col } from 'sequelize';
 import { Block } from './block.entity';
 import { CELLS_REPOSITORY, EMPTY_HASH } from '../util/constant';
 import { getCellAddress, uniqArray } from '../util/helper';
@@ -180,36 +180,45 @@ export class CellService {
     lockHash: string,
     totalCapacity: string,
   ): Promise<Cell[]> {
-    const liveCells = await this.cellModel.findAll({
-      where: {
-        lockId: lockHash,
-        isLive: true,
-        typeId: '',
-        dataLen: 0,
-        direction: 1,
-      },
-      order: [['blockNumber', 'asc']],
-      limit: 100,
-    });
-
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
     const costCapacity = BigInt(totalCapacity);
     let inputCapacity = BigInt(0);
     let selectedCells = [];
+    let offset = 0;
 
-    for (let i = 0; i < liveCells.length; i++) {
-      const c = liveCells[i];
-      inputCapacity = add(inputCapacity, BigInt(c.size));
+    while (true) {
+      const liveCells = await this.cellModel.findAll({
+        where: {
+          lockId: lockHash,
+          isLive: true,
+          typeId: '',
+          dataLen: 0,
+          direction: 1,
+        },
+        order: [['blockNumber', 'asc']],
+        limit: 100,
+        offset,
+      });
 
-      selectedCells.push(c);
+      for (let i = 0; i < liveCells.length; i++) {
+        const c = liveCells[i];
+        inputCapacity = add(inputCapacity, BigInt(c.size));
+
+        selectedCells.push(c);
+        if (greaterThan(inputCapacity, costCapacity)) {
+          break;
+        }
+      }
+
       if (greaterThan(inputCapacity, costCapacity)) {
         break;
+        // throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
       }
-    }
-
-    if (lessThan(inputCapacity, costCapacity)) {
-      throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
+      if(liveCells.length < 100){
+        break;
+      }
+      offset += 100;
     }
 
     return selectedCells;
@@ -325,7 +334,7 @@ export class CellService {
       return item['hash'];
     });
 
-    if(txhashList.length === 0){
+    if (txhashList.length === 0) {
       return [];
     }
 
@@ -386,11 +395,10 @@ export class CellService {
       console.log('txInputCells', txInputCells.length);
       console.log('txOutputCells', txOutputCells.length);
 
-
-    let prefix =
-      this.ckbService.getChain() == 'ckb'
-        ? AddressPrefix.Mainnet
-        : AddressPrefix.Testnet;
+      let prefix =
+        this.ckbService.getChain() == 'ckb'
+          ? AddressPrefix.Mainnet
+          : AddressPrefix.Testnet;
 
       let from =
         txInputCells.length > 0
@@ -425,13 +433,10 @@ export class CellService {
     return fullTxs;
   }
 
-
   async getCapacityByLockHash(lockHash) {
     let capacity = await this.cellModel.sum('size', {
       where: { lockId: lockHash, isLive: true, direction: true },
     });
     return '0x' + capacity.toString(16);
   }
-
-
 }
