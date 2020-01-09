@@ -182,7 +182,7 @@ export class CellService {
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
-    const costCapacity = BigInt(totalCapacity);
+    const costCapacity = add(BigInt(totalCapacity), BigInt(10**8));
     let inputCapacity = BigInt(0);
     let selectedCells = [];
     let offset = 0;
