@@ -320,9 +320,9 @@ export class CellService {
     }
 
     const results = await this.cellModel.findAll({
-      attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'id'],
+      attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'blockNumber'],
       where: conditions,
-      order: [['id', 'desc']],
+      order: [['blockNumber', 'desc']],
       limit,
     });
     // console.log('result', results);
