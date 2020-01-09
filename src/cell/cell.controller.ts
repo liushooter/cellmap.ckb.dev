@@ -72,17 +72,16 @@ export class CellController {
   @Get('txList')
   async getTxList(
     @Query('lockHash') lockHash,
-    @Query('lastBlock') lastBlock,
+    @Query('lastHash') lastHash,
     @Query('size') size,
     @Query('type') type,
   ) {
     size = size > 0 ? parseInt(size) : 20;
-    lastBlock = lastBlock > 0 ? lastBlock : 999999999;
     let cells = await this.cellService.loadTxByConditions(
       lockHash,
       type,
       size,
-      lastBlock,
+      lastHash,
     );
 
     return cells;

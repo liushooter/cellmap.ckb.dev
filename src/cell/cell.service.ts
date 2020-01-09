@@ -182,7 +182,7 @@ export class CellService {
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
-    const costCapacity = add(BigInt(totalCapacity), BigInt(10**8));
+    const costCapacity = add(BigInt(totalCapacity), BigInt(10 ** 8));
     let inputCapacity = BigInt(0);
     let selectedCells = [];
     let offset = 0;
@@ -215,7 +215,7 @@ export class CellService {
         break;
         // throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
       }
-      if(liveCells.length < 100){
+      if (liveCells.length < 100) {
         break;
       }
       offset += 100;
@@ -304,133 +304,168 @@ export class CellService {
     lockHash: string,
     direction: string,
     limit: number,
-    lastBlock: number,
+    lastHash: string,
   ) {
     let conditions = {
       lockId: lockHash,
-      blockNumber: {
-        [Op.lte]: lastBlock,
-      },
     };
-    if (direction == 'in') {
-      conditions['direction'] = 1;
-    } else if (direction == 'out') {
-      conditions['direction'] = 0;
-    } else {
-    }
-
-    const results = await this.cellModel.findAll({
-      attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'blockNumber'],
-      where: conditions,
-      order: [['blockNumber', 'desc']],
-      limit,
-    });
-    // console.log('result', results);
 
     let fullTxs = [];
 
-    let txhashList = results.map(x => {
-      let item = x.get({ plain: true });
-      return item['hash'];
-    });
-
-    if (txhashList.length === 0) {
-      return [];
-    }
-
-    txhashList = uniqArray(txhashList);
-
-    console.log('txHashList', txhashList);
-
-    const allOutputCells = await this.cellModel.findAll({
-      where: { hash: { [Op.in]: txhashList }, direction: true },
-      order: [['time', 'desc']],
-    });
-
-    const allInputCells = await this.cellModel.findAll({
-      where: { hash: { [Op.in]: txhashList }, direction: false },
-      order: [['time', 'desc']],
-    });
-
-    // console.log('allOutputCells', allOutputCells.length);
-
-    for (let hash of txhashList) {
-      // let hash = tx['hash'];
-      // let time = tx['blockNumber'];
-      // console.log('tx', tx, hash, time);
-      let txInputCells = allInputCells
-        .filter(x => x.hash === hash)
-        .sort((a, b) => a.idx - b.idx);
-
-      let txOutputCells = allOutputCells
-        .filter(x => x.hash === hash)
-        .sort((a, b) => a.idx - b.idx);
-
-      console.log('input', txInputCells.length);
-      console.log('output', txOutputCells.length);
-
-      let time = txOutputCells[0].time;
-
-      let { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
-
-      let userInputCells = txInputCells.filter(c => c.lockId == lockHash);
-      let userOutputCells = txOutputCells.filter(c => c.lockId == lockHash);
-
-      const inAmount =
-        userInputCells.length > 0
-          ? userInputCells.map(c => BigInt(c.size)).reduce(add)
-          : BigInt(0);
-      const outAmount =
-        userOutputCells.length > 0
-          ? userOutputCells.map(c => BigInt(c.size)).reduce(add)
-          : BigInt(0);
-
-      // console.log(inputCells.filter((c)=>c.lockId == lockHash).map((c)=>BigInt(c.size)));
-      // console.log(inAmount, outAmount);
-
-      let direction, amount;
-      let inputSize = txInputCells.length;
-      let outputSize = txOutputCells.length;
-
-      console.log('txInputCells', txInputCells.length);
-      console.log('txOutputCells', txOutputCells.length);
-
-      let prefix =
-        this.ckbService.getChain() == 'ckb'
-          ? AddressPrefix.Mainnet
-          : AddressPrefix.Testnet;
-
-      let from =
-        txInputCells.length > 0
-          ? getCellAddress(txInputCells[0], prefix)
-          : 'cellbase';
-      let to = getCellAddress(txOutputCells[0], prefix);
-
-      let blockNumber = txOutputCells[0].blockNumber;
-
-      if (greaterThan(outAmount, inAmount)) {
-        direction = 'in';
-        amount = '0x' + subtract(outAmount, inAmount).toString(16);
-      } else {
-        direction = 'out';
-        amount = '0x' + subtract(inAmount, outAmount).toString(16);
-      }
-
-      console.log(from, '-------------', to, '-----', amount);
-
-      fullTxs.push({
-        hash,
-        time,
-        from,
-        to,
-        amount,
-        direction,
-        blockNumber,
-        inputSize,
-        outputSize,
+    let lastId = 999999999999;
+    if (!lastHash) {
+    } else {
+      lastId = await this.cellModel.min('id', {
+        where: { lockId: lockHash, hash: lastHash },
       });
     }
+
+    if( direction == 'in' ) {
+      conditions['direction'] = 1;
+    }else if(direction == 'out') {
+      conditions['direction'] = 0;
+    }else{
+
+    }
+
+    while (true) {
+
+      conditions['id'] = {[Op.lt]: lastId};
+
+      console.log('condition is', conditions);
+
+      const results = await this.cellModel.findAll({
+        attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'blockNumber'],
+        where: conditions,
+        order: [['blockNumber', 'desc']],
+        limit,
+      });
+
+      let txhashList = results.map(x => {
+        let item = x.get({ plain: true });
+        return item['hash'];
+      });
+
+      if (txhashList.length === 0) {
+        break;
+      }
+
+      txhashList = uniqArray(txhashList);
+
+      console.log('txHashList', txhashList);
+
+      const allOutputCells = await this.cellModel.findAll({
+        where: { hash: { [Op.in]: txhashList }, direction: true },
+        order: [['time', 'desc']],
+      });
+
+      const allInputCells = await this.cellModel.findAll({
+        where: { hash: { [Op.in]: txhashList }, direction: false },
+        order: [['time', 'desc']],
+      });
+
+      for (let hash of txhashList) {
+        const tx = this.buildTx(allInputCells, allOutputCells, hash, lockHash);
+
+        if (
+        (direction == 'in' && tx.direction == 'in') ||
+        (direction == 'out' && tx.direction == 'out') ||
+        !direction
+        ) {
+          fullTxs.push(tx);
+        } 
+      }
+
+      if (fullTxs.length >= 5) {
+        break;
+      }
+
+      
+      let lastInputId = 9999999;
+      if(allInputCells.length > 0){
+        lastInputId = allInputCells[allInputCells.length - 1].id;
+      }
+      let lastOutputId = 9999999;
+      if(allOutputCells.length > 0){
+        lastOutputId= allOutputCells[allOutputCells.length - 1].id;
+      }
+
+      lastId = lastInputId < lastOutputId? lastInputId: lastOutputId;
+
+    }
+
     return fullTxs;
+  }
+
+  buildTx(allInputCells, allOutputCells, hash, lockHash) {
+    let txInputCells = allInputCells
+      .filter(x => x.hash === hash)
+      .sort((a, b) => a.idx - b.idx);
+
+    let txOutputCells = allOutputCells
+      .filter(x => x.hash === hash)
+      .sort((a, b) => a.idx - b.idx);
+
+    console.log('input', txInputCells.length);
+    console.log('output', txOutputCells.length);
+
+    let time = txOutputCells[0].time;
+
+    let { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
+
+    let userInputCells = txInputCells.filter(c => c.lockId == lockHash);
+    let userOutputCells = txOutputCells.filter(c => c.lockId == lockHash);
+
+    const inAmount =
+      userInputCells.length > 0
+        ? userInputCells.map(c => BigInt(c.size)).reduce(add)
+        : BigInt(0);
+    const outAmount =
+      userOutputCells.length > 0
+        ? userOutputCells.map(c => BigInt(c.size)).reduce(add)
+        : BigInt(0);
+
+    let direction, amount;
+    let inputSize = txInputCells.length;
+    let outputSize = txOutputCells.length;
+
+    console.log('txInputCells', txInputCells.length);
+    console.log('txOutputCells', txOutputCells.length);
+
+    let prefix =
+      this.ckbService.getChain() == 'ckb'
+        ? AddressPrefix.Mainnet
+        : AddressPrefix.Testnet;
+
+    let from =
+      txInputCells.length > 0
+        ? getCellAddress(txInputCells[0], prefix)
+        : 'cellbase';
+    let to = getCellAddress(txOutputCells[0], prefix);
+
+    let blockNumber = txOutputCells[0].blockNumber;
+
+    if (greaterThan(outAmount, inAmount)) {
+      direction = 'in';
+      amount = '0x' + subtract(outAmount, inAmount).toString(16);
+    } else {
+      direction = 'out';
+      amount = '0x' + subtract(inAmount, outAmount).toString(16);
+    }
+
+    console.log(from, '-------------', to, '-----', amount);
+
+    return {
+      hash,
+      time,
+      from,
+      to,
+      amount,
+      direction,
+      blockNumber,
+      inputSize,
+      outputSize,
+    };
   }
 
   async getCapacityByLockHash(lockHash) {
