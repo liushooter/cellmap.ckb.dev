@@ -196,7 +196,7 @@ export class CellService {
           dataLen: 0,
           direction: 1,
         },
-        order: [['blockNumber', 'asc']],
+        order: [['id', 'asc']],
         limit: 100,
         offset,
       });
