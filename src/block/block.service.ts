@@ -22,7 +22,7 @@ export class BlockService extends NestSchedule {
   private syncing = false;
   private syncingBlock = 0;
 
-  @Interval(10 * 1000)
+  @Interval(5 * 1000)
   async sync() {
     if (this.syncing) {
       console.log('Sync Skipped', this.syncingBlock);
@@ -78,5 +78,16 @@ export class BlockService extends NestSchedule {
   async getBlockByNumber(height: Number): Promise<CKBComponents.Block> {
     let hexHeight = '0x' + height.toString(16);
     return await this.ckb.rpc.getBlockByNumber(hexHeight);
+  }
+
+  async getFeeRate(): Promise<CKBComponents.FeeRate> {
+    let feeRate: CKBComponents.FeeRate = {feeRate: '1000'};
+    try{
+      let ret = await this.ckb.rpc.estimateFeeRate('0x3');
+      // console.log('ret', ret);
+    }catch(err){
+      console.log(err);
+    }
+    return feeRate;
   }
 }

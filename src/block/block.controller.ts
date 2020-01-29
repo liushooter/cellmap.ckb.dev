@@ -13,8 +13,15 @@ export class BlockController {
     return await this.blockService.getLastestBlock();
   }
 
+  @Get('feeRate')
+  async getFeeRate(): Promise<CKBComponents.FeeRate> {
+    return await this.blockService.getFeeRate();
+  }
+
   @Get(':height')
   async getBlockByNumber(@Param('height') height): Promise<CKBComponents.Block> {
     return await this.blockService.getBlockByNumber(parseInt(height))
   }
+
+
 }
