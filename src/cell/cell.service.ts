@@ -376,7 +376,7 @@ export class CellService {
         } 
       }
 
-      if (fullTxs.length >= 5) {
+      if (fullTxs.length >= 5 || fullTxs.length >= limit) {
         break;
       }
 
