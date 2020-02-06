@@ -187,6 +187,7 @@ export class CellService {
     let selectedCells = [];
     let offset = 0;
 
+    let cellbase = false;
     while (true) {
       const liveCells = await this.cellModel.findAll({
         where: {
@@ -195,6 +196,7 @@ export class CellService {
           typeId: '',
           dataLen: 0,
           direction: 1,
+          cellbase,
         },
         order: [['id', 'asc']],
         limit: 100,
@@ -216,7 +218,14 @@ export class CellService {
         // throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
       }
       if (liveCells.length < 100) {
-        break;
+
+        if(cellbase){
+          break;
+        }else{
+          cellbase = true;
+          offset = 0;
+          continue;
+        }
       }
       offset += 100;
     }

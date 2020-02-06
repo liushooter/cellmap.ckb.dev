@@ -41,7 +41,7 @@ export class CellController {
       const outputDataLen = '0x' + cell.dataLen.toString(16);
 
       const capacity = cell.size;
-      const cellbase = true;
+      const cellbase = cell.cellbase;
       const type =
         cell.typeId === ''
           ? null
