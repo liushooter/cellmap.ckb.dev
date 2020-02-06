@@ -10,7 +10,7 @@ export const getCellAddress = (cell, prefix) => {
   let type =
     lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
 
-  if (lockCode === ETH_LOCK_CODE && lockType == 'data') {
+  if (lockCode === ETH_LOCK_CODE && lockType == 'type') {
     return lockArgs;
   }
 
