@@ -199,7 +199,7 @@ export class CellService {
           cellbase,
         },
         order: [['id', 'asc']],
-        limit: 100,
+        limit: 1000,
         offset,
       });
 
@@ -217,7 +217,7 @@ export class CellService {
         break;
         // throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
       }
-      if (liveCells.length < 100) {
+      if (liveCells.length < 1000) {
 
         if(cellbase){
           break;
@@ -227,7 +227,7 @@ export class CellService {
           continue;
         }
       }
-      offset += 100;
+      offset += 1000;
     }
 
     return selectedCells;
