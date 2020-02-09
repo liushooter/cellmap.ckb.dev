@@ -16,6 +16,7 @@ export class CellController {
   async getUnspentCell(
     @Query('lockHash') lockHash,
     @Query('capacity') capacity,
+    @Query('lastId') lastId,
   ) {
     if (!capacity) {
       throw new Error('param capacity is invalid');
@@ -25,6 +26,7 @@ export class CellController {
     const cells = await this.cellService.pickLiveCellForTransfer(
       lockHash,
       capacity,
+      lastId,
     );
 
     let formatedCells = cells.map(cell => {
@@ -42,6 +44,7 @@ export class CellController {
 
       const capacity = cell.size;
       const cellbase = cell.cellbase;
+      const id = cell.id;
       const type =
         cell.typeId === ''
           ? null
@@ -55,6 +58,7 @@ export class CellController {
         
       const status = 'live';
       return {
+        id,
         blockHash,
         lock,
         outPoint,

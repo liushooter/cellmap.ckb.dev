@@ -179,23 +179,37 @@ export class CellService {
   async pickLiveCellForTransfer(
     lockHash: string,
     totalCapacity: string,
+    lastId: number,
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
+
+
+    let condition = {
+      lockId: lockHash,
+      isLive: true,
+      typeId: '',
+      dataLen: 0,
+      direction: 1,
+    };
+
+    let cellbase = false;
+    if (lastId > 0){
+      const lastCell = await this.cellModel.findByPk(lastId);
+      if(lastCell){
+        cellbase = lastCell.cellbase;
+      }
+      condition['id'] = { [Op.gt]: lastId };
+    }
 
     const costCapacity = add(BigInt(totalCapacity), BigInt(62 * 10 ** 8));
     let inputCapacity = BigInt(0);
     let selectedCells = [];
     let offset = 0;
 
-    let cellbase = false;
     while (true) {
       const liveCells = await this.cellModel.findAll({
         where: {
-          lockId: lockHash,
-          isLive: true,
-          typeId: '',
-          dataLen: 0,
-          direction: 1,
+          ...condition,
           cellbase,
         },
         order: [['id', 'asc']],
@@ -224,6 +238,7 @@ export class CellService {
         }else{
           cellbase = true;
           offset = 0;
+          delete condition['id'];
           continue;
         }
       }
@@ -339,7 +354,9 @@ export class CellService {
 
     while (true) {
 
-      conditions['id'] = {[Op.lt]: lastId};
+      if(lastId < 999999999999){
+        conditions['id'] = { [Op.lt]: lastId };
+      }
 
       console.log('condition is', conditions);
 
