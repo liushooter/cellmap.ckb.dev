@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_HASH } from 'src/util/constant';
+import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_ID } from 'src/util/constant';
 import { Cell } from 'src/cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
 import { Block } from 'src/cell/block.entity';
@@ -20,13 +20,17 @@ export class DaoService {
 
   async getDaoCells(lockHash) {
 
-    let cells = await this.cellModel.findAll({
-      where: {
-        lockId: lockHash,
-        typeId: DAO_TYPE_HASH,
+    const condition = {
+        typeId: DAO_TYPE_ID,
         isLive: true,
-      },
-      order: [['blockNumber', 'desc']],
+    };
+    if(lockHash){
+      condition['lockId'] = lockHash;
+    }
+
+    let cells = await this.cellModel.findAll({
+      where: condition,
+      order: [['id', 'desc']],
     });
 
     let daoCells = [];
@@ -41,7 +45,7 @@ export class DaoService {
           hash,
           idx,
           lockId,
-          typeId: DAO_TYPE_HASH,
+          typeId: DAO_TYPE_ID,
           direction: false,
         },
       });
@@ -53,9 +57,52 @@ export class DaoService {
         withdrawBlockNumber = blockNumber;
       }
 
-      const {rate, countedCapacity} = await this.calculateDAOProfit({depositBlockNumber, withdrawBlockNumber, size});
+      if (!withdrawBlockNumber) {
+        let tip = await this.statModel.findOne({});
+        withdrawBlockNumber = tip.tip;
+      }
+      const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
+      const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
 
-      daoCells.push({ hash, idx, size, depositBlockNumber, withdrawBlockNumber, type, rate, countedCapacity });
+      const { rate, countedCapacity } = await this.calculateDAOProfit(
+        { depositBlockNumber, withdrawBlockNumber, size },
+        depositBlock,
+        withdrawBlock,
+      );
+
+      const depositBlockHeader = {
+        hash: depositBlock.hash,
+        number: depositBlock.number,
+        epoch: {
+          length: '0x' + Number(depositBlock.epochLength).toString(16),
+          index: '0x' + Number(depositBlock.epochIndex).toString(16),
+          number: '0x' + Number(depositBlock.epochNumber).toString(16),
+        },
+      };
+
+      const withdrawBlockHeader =
+        type == 'withdraw'
+          ? {
+              hash: withdrawBlock.hash,
+              number: withdrawBlock.number,
+              epoch: {
+                length: '0x' + Number(withdrawBlock.epochLength).toString(16),
+                index: '0x' + Number(withdrawBlock.epochIndex).toString(16),
+                number: '0x' + Number(withdrawBlock.epochNumber).toString(16),
+              },
+            }
+          : null;
+
+      daoCells.push({
+        hash,
+        idx,
+        size,
+        depositBlockHeader,
+        withdrawBlockHeader,
+        type,
+        rate,
+        countedCapacity,
+      });
     }
 
     return daoCells;
@@ -82,20 +129,16 @@ export class DaoService {
 
   }
 
-  async calculateDAOProfit(dao){
+  async calculateDAOProfit(dao, depositBlock, withdrawBlock){
 
     let {depositBlockNumber, withdrawBlockNumber, size} = dao;
 
-    if(!withdrawBlockNumber){
-      let tip = await this.statModel.findOne({});
-      withdrawBlockNumber = tip.tip;
-    }
-
-    const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
-    const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
 
     const { divide, multiply, BigInt } = JSBI;
     const capacity = BigInt(size);
+
+    console.log(depositBlock)
+    console.log(withdrawBlock)
 
     const depositRate = this.parseDao(depositBlock.dao).accumulated_rate;
     const withdrawRate = this.parseDao(withdrawBlock.dao).accumulated_rate;
