@@ -73,6 +73,7 @@ export class DaoService {
       const depositBlockHeader = {
         hash: depositBlock.hash,
         number: depositBlock.number,
+        timestamp: depositBlock.timestamp,
         epoch: {
           length: '0x' + Number(depositBlock.epochLength).toString(16),
           index: '0x' + Number(depositBlock.epochIndex).toString(16),
@@ -85,6 +86,7 @@ export class DaoService {
           ? {
               hash: withdrawBlock.hash,
               number: withdrawBlock.number,
+              timestamp: withdrawBlock.timestamp,
               epoch: {
                 length: '0x' + Number(withdrawBlock.epochLength).toString(16),
                 index: '0x' + Number(withdrawBlock.epochIndex).toString(16),
@@ -92,7 +94,6 @@ export class DaoService {
               },
             }
           : null;
-
       daoCells.push({
         hash,
         idx,
