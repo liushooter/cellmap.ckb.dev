@@ -4,7 +4,7 @@ import { Cell } from './cell.entity';
 import { AddressPrefix } from '@nervosnetwork/ckb-sdk-utils';
 import { Op, fn, col } from 'sequelize';
 import { Block } from './block.entity';
-import { CELLS_REPOSITORY, EMPTY_HASH } from '../util/constant';
+import { CELLS_REPOSITORY, EMPTY_HASH, DAO_TYPE_ID } from '../util/constant';
 import { getCellAddress, uniqArray } from '../util/helper';
 
 @Injectable()
@@ -183,7 +183,6 @@ export class CellService {
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
-
     let condition = {
       lockId: lockHash,
       isLive: true,
@@ -193,9 +192,9 @@ export class CellService {
     };
 
     let cellbase = false;
-    if (lastId > 0){
+    if (lastId > 0) {
       const lastCell = await this.cellModel.findByPk(lastId);
-      if(lastCell){
+      if (lastCell) {
         cellbase = lastCell.cellbase;
       }
       condition['id'] = { [Op.gt]: lastId };
@@ -232,10 +231,9 @@ export class CellService {
         // throw new Error(`Input capacity ${inputCapacity} is not enough for ${costCapacity}`);
       }
       if (liveCells.length < 1000) {
-
-        if(cellbase){
+        if (cellbase) {
           break;
-        }else{
+        } else {
           cellbase = true;
           offset = 0;
           delete condition['id'];
@@ -344,17 +342,15 @@ export class CellService {
       });
     }
 
-    if( direction == 'in' ) {
+    if (direction == 'in') {
       conditions['direction'] = 1;
-    }else if(direction == 'out') {
+    } else if (direction == 'out') {
       conditions['direction'] = 0;
-    }else{
-
+    } else {
     }
 
     while (true) {
-
-      if(lastId < 999999999999){
+      if (lastId < 999999999999) {
         conditions['id'] = { [Op.lt]: lastId };
       }
 
@@ -394,33 +390,59 @@ export class CellService {
         const tx = this.buildTx(allInputCells, allOutputCells, hash, lockHash);
 
         if (
-        (direction == 'in' && tx.direction == 'in') ||
-        (direction == 'out' && tx.direction == 'out') ||
-        (direction != 'in' && direction != 'out')
+          (direction == 'in' && tx.direction == 'in') ||
+          (direction == 'out' && tx.direction == 'out') ||
+          (direction != 'in' && direction != 'out')
         ) {
           fullTxs.push(tx);
-        } 
+        }
       }
 
       if (fullTxs.length >= 5 || fullTxs.length >= limit) {
         break;
       }
 
-      
       let lastInputId = 9999999;
-      if(allInputCells.length > 0){
+      if (allInputCells.length > 0) {
         lastInputId = allInputCells[allInputCells.length - 1].id;
       }
       let lastOutputId = 9999999;
-      if(allOutputCells.length > 0){
-        lastOutputId= allOutputCells[allOutputCells.length - 1].id;
+      if (allOutputCells.length > 0) {
+        lastOutputId = allOutputCells[allOutputCells.length - 1].id;
       }
 
-      lastId = lastInputId < lastOutputId? lastInputId: lastOutputId;
-
+      lastId = lastInputId < lastOutputId ? lastInputId : lastOutputId;
     }
 
     return fullTxs;
+  }
+
+  getTxType(inputCells, outputCells) {
+    let inputType = null;
+    inputCells.forEach(cell => {
+      if (cell.typeId === DAO_TYPE_ID) {
+        inputType = 'dao';
+      }
+    });
+    let outputType = null;
+    outputCells.forEach(cell => {
+      if (cell.typeId === DAO_TYPE_ID) {
+        outputType = 'dao';
+      }
+    });
+
+    if (inputType === 'dao' && outputType === 'dao') {
+      return 'dao-withdraw1';
+    }
+
+    if (inputType === 'dao' && outputType === null) {
+      return 'dao-withdraw2';
+    }
+
+    if (inputType === null && outputType === 'dao') {
+      return 'dao-deposit';
+    }
+    return null;
   }
 
   buildTx(allInputCells, allOutputCells, hash, lockHash) {
@@ -434,6 +456,8 @@ export class CellService {
 
     console.log('input', txInputCells.length);
     console.log('output', txOutputCells.length);
+
+    const type = this.getTxType(txInputCells, txOutputCells);
 
     let time = txOutputCells[0].time;
 
@@ -486,6 +510,7 @@ export class CellService {
       time,
       from,
       to,
+      type,
       amount,
       direction,
       blockNumber,
