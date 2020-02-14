@@ -48,3 +48,30 @@ export const uniqArray = function(array) {
   }
   return res;
 };
+
+
+export const hex_data_occupied_bytes = hex_string => {
+  // Exclude 0x prefix, and every 2 hex digits are one byte
+  return (hex_string.length - 2) / 2;
+};
+
+export const script_occupied_bytes = (script) => {
+  if (script !== undefined && script !== null) {
+    return (
+      1 +
+      hex_data_occupied_bytes(script.codeHash) +
+      hex_data_occupied_bytes(script.args)
+      //   script.args.map(hex_data_occupied_bytes).reduce((x, y) => x + y, 0)
+    );
+  }
+  return 0;
+}
+
+export const cell_occupied_bytes = (cell) => {
+  return (
+    8 +
+    hex_data_occupied_bytes(cell.data) +
+    script_occupied_bytes(cell.lock) +
+    script_occupied_bytes(cell.type)
+  );
+}

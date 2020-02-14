@@ -61,6 +61,7 @@ export class DaoService {
         let tip = await this.statModel.findOne({});
         withdrawBlockNumber = tip.tip;
       }
+      console.log('blockNumber', depositBlockNumber, withdrawBlockNumber)
       const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
       const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
 
@@ -109,49 +110,63 @@ export class DaoService {
     return daoCells;
   }
 
+
   parseDao(dao){
-    const reverseString = (str: string) =>
-      str
-        .split('')
-        .reverse()
-        .join(''); 
+    const { BigInt } = JSBI;
+    
+    const fromHexInLittleEndian = (str) =>{
+
+        return '0x'+str.match(/../g).reverse().join('');
+
+    }
+    
     let daoHex = dao.replace('0x', '');
 
-    const { BigInt } = JSBI;
-
-    const accumulated_rate = BigInt('0x' + reverseString(daoHex.slice(0, 8)));
-    const total_issued = BigInt('0x' + reverseString(daoHex.slice(16, 32)));
-    const total_unissued = BigInt('0x' + reverseString(daoHex.slice(32, 48)));
-    const occupied_capacity = BigInt('0x' + reverseString(daoHex.slice(48, 64)));
+    const total_issued = BigInt(fromHexInLittleEndian(daoHex.slice(0, 16)));
+    const accumulated_rate = BigInt(fromHexInLittleEndian(daoHex.slice(16, 32)));
+    const total_unissued = BigInt(fromHexInLittleEndian(daoHex.slice(32, 48)));
+    const occupied_capacity = BigInt(fromHexInLittleEndian(daoHex.slice(48, 64)));
 
     // console.log('dao', { accumulated_rate, total_issued, total_unissued, occupied_capacity })
 
     return { accumulated_rate, total_issued, total_unissued, occupied_capacity }
+    
 
   }
 
+
   async calculateDAOProfit(dao, depositBlock, withdrawBlock){
 
-    let {depositBlockNumber, withdrawBlockNumber, size} = dao;
+    let { size } = dao;
+    const { add, divide, multiply, subtract, BigInt } = JSBI;
 
-
-    const { divide, multiply, BigInt } = JSBI;
-    const capacity = BigInt(size);
-
-    console.log(depositBlock)
-    console.log(withdrawBlock)
+    const occupied_capacity = BigInt(102*10**8);
+    const capacity = subtract(BigInt(size), occupied_capacity);
 
     const depositRate = this.parseDao(depositBlock.dao).accumulated_rate;
     const withdrawRate = this.parseDao(withdrawBlock.dao).accumulated_rate;
 
-    let countedCapacity = divide(multiply(capacity, withdrawRate), depositRate).toString();
+    let withdrawCountedCapacity = divide(multiply(capacity, withdrawRate), depositRate);
+
+    const countedCapacity = add(withdrawCountedCapacity, occupied_capacity).toString();
 
     let timeDuration = withdrawBlock.timestamp - depositBlock.timestamp;
+    console.log('rate', depositRate.toString(10), withdrawRate.toString(10));
     console.log('timeDruation is ', timeDuration);
-    const rateBI = divide(divide(multiply(withdrawRate, BigInt(365*24*3600*10000)), depositRate), BigInt(timeDuration));
+    const rateBI = divide(
+      subtract(
+        divide(
+          multiply(withdrawRate, BigInt(365 * 24 * 3600 * 10000000)),
+          depositRate,
+        ),
+        BigInt(365 * 24 * 3600 * 10000000),
+      ),
+      BigInt(timeDuration),
+    );
     const rate = Number(rateBI.toString())/10000;
 
     return {rate, countedCapacity};
+
 
   }
 }
