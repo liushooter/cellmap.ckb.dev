@@ -419,30 +419,39 @@ export class CellService {
 
   getTxType(inputCells, outputCells) {
     let inputType = null;
+    let inputAmount = 0;
     inputCells.forEach(cell => {
       if (cell.typeId === DAO_TYPE_ID) {
         inputType = 'dao';
+        inputAmount = cell.size;
       }
     });
     let outputType = null;
+    let outputAmount = 0;
     outputCells.forEach(cell => {
       if (cell.typeId === DAO_TYPE_ID) {
         outputType = 'dao';
+        outputAmount = cell.size;
       }
     });
 
+    let type = null;
+    let daoAmount = 0;
     if (inputType === 'dao' && outputType === 'dao') {
-      return 'dao-withdraw1';
+      type = 'dao-withdraw1';
+      daoAmount = inputAmount;
     }
 
     if (inputType === 'dao' && outputType === null) {
-      return 'dao-withdraw2';
+      type = 'dao-withdraw2';
+      daoAmount = inputAmount;
     }
 
     if (inputType === null && outputType === 'dao') {
-      return 'dao-deposit';
+      type = 'dao-deposit';
+      daoAmount = outputAmount;
     }
-    return null;
+    return { type, daoAmount };
   }
 
   buildTx(allInputCells, allOutputCells, hash, lockHash) {
@@ -457,7 +466,7 @@ export class CellService {
     console.log('input', txInputCells.length);
     console.log('output', txOutputCells.length);
 
-    const type = this.getTxType(txInputCells, txOutputCells);
+    const { type, daoAmount } = this.getTxType(txInputCells, txOutputCells);
 
     let time = txOutputCells[0].time;
 
@@ -501,6 +510,13 @@ export class CellService {
     } else {
       direction = 'out';
       amount = '0x' + subtract(inAmount, outAmount).toString(16);
+    }
+
+    if(type === 'dao-withdraw2') {
+      amount = '0x' + outAmount.toString(16);
+    }
+    if(type === 'dao-deposit' || type === 'dao-withdraw1'){
+      amount = '0x' +BigInt(daoAmount).toString(16);
     }
 
     console.log(from, '-------------', to, '-----', amount);
