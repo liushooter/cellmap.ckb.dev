@@ -537,7 +537,7 @@ export class CellService {
 
   async getCapacityByLockHash(lockHash) {
     let capacity = await this.cellModel.sum('size', {
-      where: { lockId: lockHash, isLive: true, direction: true },
+      where: { lockId: lockHash, typeId: '', isLive: true, direction: true },
     });
     return '0x' + capacity.toString(16);
   }

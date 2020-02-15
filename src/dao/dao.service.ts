@@ -5,6 +5,7 @@ import { SyncStat } from 'src/block/syncstat.entity';
 import { Block } from 'src/cell/block.entity';
 import { CkbService } from 'src/ckb/ckb.service';
 import { JSBI } from '@nervosnetwork/ckb-sdk-utils';
+import apc from 'src/util/apc'
      
 
 @Injectable()
@@ -153,17 +154,24 @@ export class DaoService {
     let timeDuration = withdrawBlock.timestamp - depositBlock.timestamp;
     console.log('rate', depositRate.toString(10), withdrawRate.toString(10));
     console.log('timeDruation is ', timeDuration);
-    const rateBI = divide(
-      subtract(
-        divide(
-          multiply(withdrawRate, BigInt(365 * 24 * 3600 * 10000000)),
-          depositRate,
-        ),
-        BigInt(365 * 24 * 3600 * 10000000),
-      ),
-      BigInt(timeDuration),
-    );
-    const rate = Number(rateBI.toString())/10000;
+    // const rateBI = divide(
+    //   subtract(
+    //     divide(
+    //       multiply(withdrawRate, BigInt(365 * 24 * 3600 * 10000000)),
+    //       depositRate,
+    //     ),
+    //     BigInt(365 * 24 * 3600 * 10000000),
+    //   ),
+    //   BigInt(timeDuration),
+    // );
+    // const rate = Number(rateBI.toString())/10000;
+    const MILLISECONDS_IN_YEAR = 365 * 24 * 3600000;
+    const genesisBlockTimestamp = 1573963200 * 1000;
+
+    const startYearNumber = (+depositBlock.timestamp - +(genesisBlockTimestamp || 0)) / MILLISECONDS_IN_YEAR
+    const endYearNumber = (+withdrawBlock.timestamp - +(genesisBlockTimestamp || 0)) / MILLISECONDS_IN_YEAR
+
+    const rate = apc({startYearNumber, endYearNumber})/100;
 
     return {rate, countedCapacity};
 
