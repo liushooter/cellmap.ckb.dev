@@ -1,65 +1,93 @@
-import { Model } from 'mongoose'
-import { Injectable } from '@nestjs/common'
-import { InjectModel } from '@nestjs/mongoose'
-import { Interval, NestSchedule } from 'nest-schedule'
-import { Block } from './interfaces/block.interface'
-import { CkbService } from '../ckb/ckb.service'
-import { CellService } from 'src/cell/cell.service'
+import { Inject, Injectable } from '@nestjs/common';
+import { Interval, NestSchedule } from 'nest-schedule';
+import { CkbService } from '../ckb/ckb.service';
+import { CellService } from 'src/cell/cell.service';
+import { SyncStat } from './syncstat.entity';
+import {SYNCSTAT_REPOSITORY} from '../util/constant'
 
 @Injectable()
 export class BlockService extends NestSchedule {
   constructor(
-    @InjectModel('Block') private readonly blockModel: Model<Block>,
+
+    @Inject(SYNCSTAT_REPOSITORY)
+    private readonly syncStatModel: typeof SyncStat,
     private readonly ckbService: CkbService,
-    private readonly cellService: CellService
-  ){ super() }
-
-  private readonly ckb = this.ckbService.getCKB()
-
-  private syncing = false
-
-  @Interval(10 * 1000)
-  async sync() {
-    if (this.syncing) { 
-      console.log('Sync Skipped')
-      return 
-    }
-
-    this.syncing = true
-
-    const header = await this.ckb.rpc.getTipHeader()
-    const last = await this.update(header)
-    const block = await this.blockModel.findOne()
-
-    for (let i = last.tip + 1; i <= block.tip; i++) {
-      await this.cellService.extractFromBlock(i)
-      i === block.tip && console.log(`Synced from ${last.tip + 1} to ${block.tip}\n`)
-    }
-
-    this.syncing = false
+    private readonly cellService: CellService,
+  ) {
+    super();
   }
 
-  async update(header: CKBComponents.BlockHeader): Promise<Block> {
+  private readonly ckb = this.ckbService.getCKB();
 
-    const tip = parseInt(header.number, 16)
+  private syncing = false;
+  private syncingBlock = 0;
 
-    const epochString = header.epoch.slice(2) // remove '0x'
-    const sn = parseInt(epochString.slice(-6), 16)
-    const idx = parseInt(epochString.slice(-10, -6), 16)
-    const len = parseInt(epochString.slice(-14, -10), 16)
-    const epoch = { sn, len, idx }
+  @Interval(5 * 1000)
+  async sync() {
+    if (this.syncing) {
+      console.log('Sync Skipped', this.syncingBlock);
+      await this.updateTip(this.syncingBlock);
+      return;
+    }
 
-    let block = await this.blockModel.findOneAndUpdate({}, { tip, epoch })
-    !block && (block = await this.blockModel.create({ tip: -1, epoch }))
+    this.syncing = true;
 
-    return block
+    const header = await this.ckb.rpc.getTipHeader();
+    const currentTip = parseInt(header.number, 16);
+    const lastBlock = await this.syncStatModel.findAll();
+    const lastTip = lastBlock.length > 0 ? lastBlock[0].tip : -1;
+
+    if (this.syncingBlock < lastTip) {
+      this.syncingBlock = lastTip;
+    }
+
+    for (let i = lastTip + 1; i <= currentTip; i++) {
+      await this.cellService.extractFromBlock(i);
+      this.syncingBlock = i;
+      i === currentTip &&
+        console.log(`Synced from ${lastTip + 1} to ${currentTip}\n`);
+    }
+
+    await this.updateTip(currentTip);
+    this.syncing = false;
+  }
+
+  async updateTip(tip: Number): Promise<any> {
+    let blocks = await this.syncStatModel.findAll();
+    let block;
+    if (blocks.length > 0) {
+      block = blocks[0];
+      block.tip = tip;
+      await block.save();
+    } else {
+      block = new SyncStat();
+      block.tip = tip;
+      await block.save();
+    }
+    return { block };
+  }
+
+  async getLastestBlock(): Promise<SyncStat> {
+    let blocks = await this.syncStatModel.findAll();
+    return blocks.length > 0 ? blocks[0] : null;
   }
 
   async getTipBlockHeader(): Promise<CKBComponents.BlockHeader> {
-    return await this.ckb.rpc.getTipHeader()
+    return await this.ckb.rpc.getTipHeader();
   }
   async getBlockByNumber(height: Number): Promise<CKBComponents.Block> {
-    let hexHeight = '0x' + height.toString(16)
-    return await this.ckb.rpc.getBlockByNumber(hexHeight)
+    let hexHeight = '0x' + height.toString(16);
+    return await this.ckb.rpc.getBlockByNumber(hexHeight);
+  }
+
+  async getFeeRate(): Promise<CKBComponents.FeeRate> {
+    let feeRate: CKBComponents.FeeRate = {feeRate: '1000'};
+    try{
+      let ret = await this.ckb.rpc.estimateFeeRate('0x3');
+      // console.log('ret', ret);
+    }catch(err){
+      console.log(err);
+    }
+    return feeRate;
   }
 }
