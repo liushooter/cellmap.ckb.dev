@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_ID } from 'src/util/constant';
+import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_ID, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
 import { Cell } from 'src/cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
 import { Block } from 'src/cell/block.entity';
@@ -165,13 +165,11 @@ export class DaoService {
     //   BigInt(timeDuration),
     // );
     // const rate = Number(rateBI.toString())/10000;
-    const MILLISECONDS_IN_YEAR = 365 * 24 * 3600000;
-    const genesisBlockTimestamp = 1573963200 * 1000;
 
-    const startYearNumber = (+depositBlock.timestamp - +(genesisBlockTimestamp || 0)) / MILLISECONDS_IN_YEAR
-    const endYearNumber = (+withdrawBlock.timestamp - +(genesisBlockTimestamp || 0)) / MILLISECONDS_IN_YEAR
+    const startYearNumber = (+depositBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
+    const endYearNumber = (+withdrawBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
 
-    const rate = apc({startYearNumber, endYearNumber})/100;
+    const rate = apc({startYearNumber, endYearNumber});
 
     return {rate, countedCapacity};
 

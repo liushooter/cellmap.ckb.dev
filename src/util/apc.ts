@@ -64,7 +64,8 @@ const calculateAPC = (
     })
   })
   const rate = rates.reduce((accumulatedRate, r) => accumulatedRate * (1 + r), 1) - 1
-  return +((rate * 100) / ratio).toFixed(2)
+//   return +((rate * 100) / ratio).toFixed(2)
+  return +((rate ) / ratio).toFixed(4)
 }
 
 export default calculateAPC
