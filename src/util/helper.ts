@@ -6,7 +6,6 @@ import { BLOCK_ASSEMBLER_CODE } from './constant';
 export const getCellAddress = (cell, prefix, ETH_LOCK_TYPE_ID) => {
   let { lockArgs, lockType, lockCode } = cell;
 
-  console.log('lockCode', lockCode, lockType)
   let type =
     lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
 

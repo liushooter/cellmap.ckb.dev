@@ -21,7 +21,7 @@ export class CkbService {
     } as CKBComponents.Node);
 
     this.ckb.rpc.getBlockchainInfo().then(result => {
-      console.log('blockchainInfo', result);
+      console.log('connect CKB chain rpc response', result);
       this.chain = result.chain;
     });
 

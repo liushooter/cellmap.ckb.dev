@@ -1,12 +1,25 @@
-import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor, Inject } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request } from 'express';
 import { format } from 'util';
+import { LoggerService } from 'nest-logger';
+import { ConfigService } from 'src/config/config.service';
 
 @Injectable()
 export class AppInterceptor implements NestInterceptor {
-  private readonly logger = new Logger(); // 实例化日志记录器
+  private readonly logger: LoggerService;
+
+  constructor(){
+    this.logger = new LoggerService('info', [
+      LoggerService.rotate({
+        fileOptions: {
+          filename: `./logs/access-%DATE%.log`,
+          level: 'info',
+        },
+      }),
+    ]);
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const start = Date.now(); // 请求开始时间

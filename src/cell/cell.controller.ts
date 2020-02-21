@@ -28,7 +28,6 @@ export class CellController {
     if (!capacity) {
       throw new Error('param capacity is invalid');
     }
-    // console.log(lockHash, capacity);
 
     const cells = await this.cellService.pickLiveCellForTransfer(
       lockHash,

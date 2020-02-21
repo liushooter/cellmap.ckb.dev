@@ -8,7 +8,6 @@ export const databaseProviders = [
   {
     provide: 'SEQUELIZE',
     useFactory: async (config: ConfigService) => {
-      console.log('start databaseprovider useFactory');
       const sequelize = new Sequelize({
         dialect: 'mysql',
         host: config.get('DATABASE_HOST'),

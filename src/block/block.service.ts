@@ -4,6 +4,7 @@ import { CkbService } from '../ckb/ckb.service';
 import { CellService } from 'src/cell/cell.service';
 import { SyncStat } from './syncstat.entity';
 import {SYNCSTAT_REPOSITORY} from '../util/constant'
+import { LoggerService } from 'nest-logger';
 
 @Injectable()
 export class BlockService extends NestSchedule {
@@ -13,6 +14,7 @@ export class BlockService extends NestSchedule {
     private readonly syncStatModel: typeof SyncStat,
     private readonly ckbService: CkbService,
     private readonly cellService: CellService,
+    private readonly logger: LoggerService,
   ) {
     super();
   }
@@ -25,7 +27,7 @@ export class BlockService extends NestSchedule {
   @Interval(5 * 1000)
   async sync() {
     if (this.syncing) {
-      console.log('Sync Skipped', this.syncingBlock);
+      this.logger.info(`Sync Skipped, current is syncing [${this.syncingBlock}]`, 'BLOCK_SYNC');
       await this.updateTip(this.syncingBlock);
       return;
     }
@@ -45,7 +47,7 @@ export class BlockService extends NestSchedule {
       await this.cellService.extractFromBlock(i);
       this.syncingBlock = i;
       i === currentTip &&
-        console.log(`Synced from ${lastTip + 1} to ${currentTip}\n`);
+        this.logger.info(`Synced block from [${lastTip + 1}] to [${currentTip}]`, 'BLOCK_SYNC');
     }
 
     await this.updateTip(currentTip);
@@ -84,9 +86,8 @@ export class BlockService extends NestSchedule {
     let feeRate: CKBComponents.FeeRate = {feeRate: '1000'};
     try{
       feeRate = await this.ckb.rpc.estimateFeeRate('0x3');
-      // console.log('ret', ret);
     }catch(err){
-      console.log(err);
+      this.logger.error('estimateFeeRate error', err, BlockService.name);
     }
     return feeRate;
   }

@@ -7,6 +7,7 @@ import { Block } from './block.entity';
 import { CELLS_REPOSITORY, EMPTY_HASH, DAO_TYPE_ID } from '../util/constant';
 import { getCellAddress, uniqArray } from '../util/helper';
 import { ConfigService } from '../config/config.service';
+import { LoggerService } from 'nest-logger';
 
 @Injectable()
 export class CellService {
@@ -15,6 +16,7 @@ export class CellService {
     private readonly cellModel: typeof Cell,
     private readonly ckbService: CkbService,
     private readonly config: ConfigService,
+    private readonly logger: LoggerService
   ) {}
 
   private readonly ckb = this.ckbService.getCKB();
@@ -75,7 +77,7 @@ export class CellService {
     try {
       await block.save();
     } catch (err) {
-      console.log(err);
+      this.logger.error(`saveBlockHeader [${JSON.stringify(block)}] err`, err, 'BLOCK_SYNC');
     }
   }
 
@@ -94,7 +96,6 @@ export class CellService {
       direction: true,
     };
 
-    // console.log('oldWhere', oldWhere);
     let oldCell = await this.cellModel.findOne({
       where: oldWhere,
     });
@@ -128,7 +129,7 @@ export class CellService {
         oldCell.rId = cell.id;
         await oldCell.save();
       } catch (err) {
-        console.log('insert err', err);
+        this.logger.error(`kill cell [${JSON.stringify(cell)}] err`, err, 'BLOCK_SYNC');
       }
     }
   }
@@ -170,7 +171,7 @@ export class CellService {
     try {
       await cell.save();
     } catch (err) {
-      console.log('insert err', err);
+      this.logger.error(`born cell [${JSON.stringify(cell)}] err`, err, 'BLOCK_SYNC');
     }
   }
 
@@ -356,7 +357,7 @@ export class CellService {
         conditions['id'] = { [Op.lt]: lastId };
       }
 
-      console.log('condition is', conditions);
+      this.logger.info(`condition is ${JSON.stringify(conditions)}`, CellService.name);
 
       const results = await this.cellModel.findAll({
         attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'blockNumber'],
@@ -376,7 +377,7 @@ export class CellService {
 
       txhashList = uniqArray(txhashList);
 
-      console.log('txHashList', txhashList);
+      this.logger.info(`txHashList ${JSON.stringify(txhashList)}`, CellService.name);
 
       const allOutputCells = await this.cellModel.findAll({
         where: { hash: { [Op.in]: txhashList }, direction: true },
@@ -457,6 +458,7 @@ export class CellService {
   }
 
   buildTx(allInputCells, allOutputCells, hash, lockHash) {
+    this.logger.info(`start build tx: ${hash} `)
     let txInputCells = allInputCells
       .filter(x => x.hash === hash)
       .sort((a, b) => a.idx - b.idx);
@@ -464,9 +466,8 @@ export class CellService {
     let txOutputCells = allOutputCells
       .filter(x => x.hash === hash)
       .sort((a, b) => a.idx - b.idx);
-
-    console.log('input', txInputCells.length);
-    console.log('output', txOutputCells.length);
+    
+    this.logger.info(`txInputCells.length = [${txInputCells.length}], txOutputCells.length = [${txOutputCells.length}]`);
 
     const { type, daoAmount } = this.getTxType(txInputCells, txOutputCells);
 
@@ -489,9 +490,6 @@ export class CellService {
     let direction, amount;
     let inputSize = txInputCells.length;
     let outputSize = txOutputCells.length;
-
-    console.log('txInputCells', txInputCells.length);
-    console.log('txOutputCells', txOutputCells.length);
 
     let prefix =
       this.ckbService.getChain() == 'ckb'
@@ -521,9 +519,10 @@ export class CellService {
       amount = '0x' +BigInt(daoAmount).toString(16);
     }
 
-    console.log(from, '-------------', to, '-----', amount);
+    this.logger.info(`TX [${hash}] ${from} -> ${to} : ${amount}`);
 
-    return {
+
+    const result = {
       hash,
       time,
       from,
@@ -535,6 +534,8 @@ export class CellService {
       inputSize,
       outputSize,
     };
+    this.logger.info(`finish buildTx: [${JSON.stringify(result)}]`)
+    return result;
   }
 
   async getCapacityByLockHash(lockHash) {

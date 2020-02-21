@@ -6,6 +6,7 @@ import { Block } from 'src/cell/block.entity';
 import { CkbService } from 'src/ckb/ckb.service';
 import { JSBI } from '@nervosnetwork/ckb-sdk-utils';
 import apc from 'src/util/apc'
+import { LoggerService } from 'nest-logger';
      
 
 @Injectable()
@@ -15,6 +16,7 @@ export class DaoService {
     @Inject(SYNCSTAT_REPOSITORY) private readonly statModel: typeof SyncStat,
     @Inject(BLOCKS_REPOSITORY) private readonly blockModel: typeof Block,
     private readonly ckbService: CkbService,
+    private readonly logger: LoggerService
   ) {}
 
   private readonly ckb = this.ckbService.getCKB();
@@ -62,7 +64,7 @@ export class DaoService {
         let tip = await this.statModel.findOne({});
         withdrawBlockNumber = tip.tip;
       }
-      console.log('blockNumber', depositBlockNumber, withdrawBlockNumber)
+      this.logger.info(`depositBlockNumber = [${depositBlockNumber}], withdrawBlockNumber = [${withdrawBlockNumber}]`, DaoService.name)
       const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
       const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
 
@@ -128,8 +130,6 @@ export class DaoService {
     const total_unissued = BigInt(fromHexInLittleEndian(daoHex.slice(32, 48)));
     const occupied_capacity = BigInt(fromHexInLittleEndian(daoHex.slice(48, 64)));
 
-    // console.log('dao', { accumulated_rate, total_issued, total_unissued, occupied_capacity })
-
     return { accumulated_rate, total_issued, total_unissued, occupied_capacity }
     
 
@@ -152,19 +152,9 @@ export class DaoService {
     const countedCapacity = add(withdrawCountedCapacity, occupied_capacity).toString();
 
     let timeDuration = withdrawBlock.timestamp - depositBlock.timestamp;
-    console.log('rate', depositRate.toString(10), withdrawRate.toString(10));
-    console.log('timeDruation is ', timeDuration);
-    // const rateBI = divide(
-    //   subtract(
-    //     divide(
-    //       multiply(withdrawRate, BigInt(365 * 24 * 3600 * 10000000)),
-    //       depositRate,
-    //     ),
-    //     BigInt(365 * 24 * 3600 * 10000000),
-    //   ),
-    //   BigInt(timeDuration),
-    // );
-    // const rate = Number(rateBI.toString())/10000;
+
+    this.logger.info(`depositRate = [${depositRate.toString(10)}], withdrawRate = [${withdrawRate.toString(10)}]`, DaoService.name);
+    this.logger.info(`timeDruation = [${timeDuration}]`, DaoService.name);
 
     const startYearNumber = (+depositBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
     const endYearNumber = (+withdrawBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
