@@ -1,25 +1,27 @@
 import { Sequelize } from 'sequelize-typescript';
-// import { Cat } from '../cats/cat.entity';
-import {Block} from '../cell/block.entity'
-import {Cell} from '../cell/cell.entity'
+import { Block } from '../cell/block.entity';
+import { Cell } from '../cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
+import { ConfigService } from '../config/config.service';
 
 export const databaseProviders = [
   {
     provide: 'SEQUELIZE',
-    useFactory: async () => {
+    useFactory: async (config: ConfigService) => {
+      console.log('start databaseprovider useFactory');
       const sequelize = new Sequelize({
         dialect: 'mysql',
-        host: 'localhost',
-        port: 3306,
-        username: 'root',
-        password: 'abc321456',
-        database: 'ckb_test_1',
-        logging: true
+        host: config.get('DATABASE_HOST'),
+        port: Number(config.get('DATABASE_PORT')),
+        username: config.get('DATABASE_USER'),
+        password: config.get('DATABASE_PASSWORD'),
+        database: config.get('DATABASE_NAME'),
+        logging: config.get('SEQUELIZE_ENABLE_LOGGING') === 'true',
       });
       sequelize.addModels([Cell, Block, SyncStat]);
-      await sequelize.sync({force: false});
+      await sequelize.sync({ force: false });
       return sequelize;
     },
+    inject: [ConfigService],
   },
 ];

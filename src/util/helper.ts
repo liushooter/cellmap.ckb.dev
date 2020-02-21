@@ -1,16 +1,16 @@
 import { AddressType, bech32Address, fullPayloadToAddress, } from '@nervosnetwork/ckb-sdk-utils';
-import { BLOCK_ASSEMBLER_CODE, ETH_LOCK_CODE } from './constant';
+import { BLOCK_ASSEMBLER_CODE } from './constant';
 
 
 
-export const getCellAddress = (cell, prefix) => {
+export const getCellAddress = (cell, prefix, ETH_LOCK_TYPE_ID) => {
   let { lockArgs, lockType, lockCode } = cell;
 
   console.log('lockCode', lockCode, lockType)
   let type =
     lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
 
-  if (lockCode === ETH_LOCK_CODE && lockType == 'type') {
+  if (lockCode === ETH_LOCK_TYPE_ID && lockType == 'type') {
     return lockArgs;
   }
 

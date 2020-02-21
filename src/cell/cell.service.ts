@@ -6,6 +6,7 @@ import { Op, fn, col } from 'sequelize';
 import { Block } from './block.entity';
 import { CELLS_REPOSITORY, EMPTY_HASH, DAO_TYPE_ID } from '../util/constant';
 import { getCellAddress, uniqArray } from '../util/helper';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class CellService {
@@ -13,6 +14,7 @@ export class CellService {
     @Inject(CELLS_REPOSITORY)
     private readonly cellModel: typeof Cell,
     private readonly ckbService: CkbService,
+    private readonly config: ConfigService,
   ) {}
 
   private readonly ckb = this.ckbService.getCKB();
@@ -498,9 +500,9 @@ export class CellService {
 
     let from =
       txInputCells.length > 0
-        ? getCellAddress(txInputCells[0], prefix)
+        ? getCellAddress(txInputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID)
         : 'cellbase';
-    let to = getCellAddress(txOutputCells[0], prefix);
+    let to = getCellAddress(txOutputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID);
 
     let blockNumber = txOutputCells[0].blockNumber;
 

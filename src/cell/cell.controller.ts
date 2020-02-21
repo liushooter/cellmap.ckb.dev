@@ -1,11 +1,17 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Injectable } from '@nestjs/common';
 import { CellService } from './cell.service';
-import { ETH_LOCK_CODE, ETH_TX_HASH, EMPTY_HASH, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
+import { EMPTY_HASH, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
+import { ConfigService } from '../config/config.service';
+
 import apc from 'src/util/apc'
 
+@Injectable()
 @Controller('cell')
 export class CellController {
-  constructor(private readonly cellService: CellService) {}
+  constructor(
+    private readonly cellService: CellService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Get('live')
   async countLive() {
@@ -104,8 +110,8 @@ export class CellController {
 
   @Get('getConfig')
   async getConfig() {
-    let keccak_code_hash = ETH_LOCK_CODE;
-    let keccak_tx_hash = ETH_TX_HASH;
+    let keccak_code_hash = this.config.ETH_LOCK_TYPE_ID;
+    let keccak_tx_hash = this.config.ETH_LOCK_TX_HASH;
     let cellDeps = await this.cellService.getEthDeps(keccak_tx_hash);
 
     const startYearNumber = (+new Date().getTime() - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR

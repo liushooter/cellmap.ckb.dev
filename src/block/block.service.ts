@@ -83,7 +83,7 @@ export class BlockService extends NestSchedule {
   async getFeeRate(): Promise<CKBComponents.FeeRate> {
     let feeRate: CKBComponents.FeeRate = {feeRate: '1000'};
     try{
-      let ret = await this.ckb.rpc.estimateFeeRate('0x3');
+      feeRate = await this.ckb.rpc.estimateFeeRate('0x3');
       // console.log('ret', ret);
     }catch(err){
       console.log(err);

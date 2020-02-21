@@ -3,25 +3,35 @@
 import { Injectable } from '@nestjs/common';
 import Core from '@nervosnetwork/ckb-sdk-core'
 import * as http from 'http'
+import { ConfigService } from 'src/config/config.service';
 
-// const ckb = new Core('http://api.yamen.co:8114')
-// const ckb = new Core('http://api.yamen.co:8114')
-const ckb = new Core('http://127.0.0.1:8114')
-let chain = 'ckb';
-ckb.rpc.setNode({ httpAgent: new http.Agent({ keepAlive: true }) } as CKBComponents.Node)
-ckb.rpc.getBlockchainInfo().then((result)=>{
-  console.log('blockchainInfo', result);
-  chain = result.chain;
-})
 
 @Injectable()
 export class CkbService {
-  getCKB() {
-    return ckb
+  private ckb: Core;
+  private chain: string;
+
+  constructor(private readonly config: ConfigService) {
+
+    this.ckb = new Core(this.config.CKB_RPC_ENDPOINT);
+    this.chain = 'ckb';
+
+    this.ckb.rpc.setNode({
+      httpAgent: new http.Agent({ keepAlive: true }),
+    } as CKBComponents.Node);
+
+    this.ckb.rpc.getBlockchainInfo().then(result => {
+      console.log('blockchainInfo', result);
+      this.chain = result.chain;
+    });
+
   }
 
-  getChain(){
-    return chain;
+  getCKB(): Core {
+    return this.ckb;
   }
 
+  getChain(): string {
+    return this.chain;
+  }
 }
