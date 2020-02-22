@@ -7,6 +7,6 @@ import { ConfigModule } from 'src/config/config.module';
 @Module({
   imports: [ConfigModule],
   providers: [CkbService],
-  exports: [CkbService]
+  exports: [CkbService],
 })
 export class CkbModule {}

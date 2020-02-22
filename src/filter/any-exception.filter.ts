@@ -22,6 +22,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse();
     const request = ctx.getRequest();
 
+    // save exception info to error log
     this.logger.log(
       format(
         '%s %s %s %s',
@@ -30,7 +31,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof Error ? exception?.stack : exception,
       ),
     );
-
 
     const status =
       exception instanceof HttpException

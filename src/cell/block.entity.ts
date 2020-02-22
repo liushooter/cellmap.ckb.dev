@@ -1,15 +1,13 @@
 import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
 
-
 @Table
-export class Block extends Model<Block>{
-
+export class Block extends Model<Block> {
   @PrimaryKey
   @Column(DataType.BIGINT)
   number: number;
 
   @Column(DataType.CHAR(66))
-  hash: string
+  hash: string;
 
   @Default(0)
   @Column(DataType.BIGINT)
@@ -24,12 +22,11 @@ export class Block extends Model<Block>{
   epochLength: number;
 
   @Column(DataType.BIGINT)
-  timestamp: number
+  timestamp: number;
 
   @Column(DataType.CHAR(66))
-  dao: string
+  dao: string;
 
   @Column(DataType.INTEGER)
-  transactionCount: number
-
+  transactionCount: number;
 }

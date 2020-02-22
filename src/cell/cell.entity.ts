@@ -13,8 +13,9 @@ import {
   indexes: [
     { unique: true, fields: ['hash', 'idx', 'direction'] },
     { fields: ['typeId'] },
-    { fields: ['lockId'] },
-    { fields: ['blockNumber'] },
+    { fields: ['lockId', 'isLive', 'typeId'] },
+    { fields: ['lockId', 'direction'] },
+    { fields: ['hash', 'direction'] },
   ],
 })
 export class Cell extends Model<Cell> {

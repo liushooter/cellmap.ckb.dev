@@ -16,15 +16,17 @@ export class CellService {
     private readonly cellModel: typeof Cell,
     private readonly ckbService: CkbService,
     private readonly config: ConfigService,
-    private readonly logger: LoggerService
+    private readonly logger: LoggerService,
   ) {}
 
   private readonly ckb = this.ckbService.getCKB();
 
-  async extractFromBlock(height: Number) {
-    const block = await this.ckb.rpc.getBlockByNumber(
-      '0x' + height.toString(16),
-    );
+  /**
+   * fetch the specified block from CKB chain, extract data and then update database
+   * @param height block number
+   */
+  async extractFromBlock(height: number) {
+    const block = await this.ckb.rpc.getBlockByNumber('0x' + height.toString(16));
 
     await this.saveBlockHeader(block.header, block.transactions.length);
 
@@ -32,48 +34,47 @@ export class CellService {
       const tx = block.transactions[i];
       const timestamp = block.header.timestamp;
 
-      const cellbase = tx.inputs[0].previousOutput.txHash == EMPTY_HASH;
-
+      const cellbase = tx.inputs[0].previousOutput.txHash === EMPTY_HASH;
       let inputs = [];
+
+      // update the spent outputs
       if (!cellbase) {
         inputs = tx.inputs.map(async (input, index) =>
           this.kill(height, i, cellbase, tx.hash, index, input, timestamp),
         );
       }
 
+      // update the unspent outputs
       const outputs = tx.outputs.map(async (output, index) =>
-        this.born(
-          height,
-          i,
-          cellbase,
-          tx.hash,
-          index,
-          output,
-          tx.outputsData[index],
-          timestamp,
-        ),
+        this.born(height, i, cellbase, tx.hash, index, output, tx.outputsData[index], timestamp),
       );
-      await Promise.all([
-        await Promise.all(inputs),
-        await Promise.all(outputs),
-      ]);
+      await Promise.all([ await Promise.all(inputs), await Promise.all(outputs) ]);
     }
   }
 
+  /**
+   * save block header info to database
+   *
+   * @param header Block header
+   * @param txCount the transaction count in the block
+   */
   async saveBlockHeader(header: CKBComponents.BlockHeader, txCount: number) {
     const block = new Block();
+    const { number, epoch, hash, timestamp, dao } = header;
+    const {number: epochNumber, index: epochIndex, length: epochLength} = this.ckb.utils.parseEpoch(epoch);
 
-    block.number = Number(header.number);
-    let epoch = this.ckb.utils.parseEpoch(header.epoch);
-    block.epochNumber = Number(epoch.number);
-    block.epochIndex = Number(epoch.index);
-    block.epochLength = Number(epoch.length);
+    const blockInfo = {
+      number: Number(number),
+      epochNumber: Number(epochNumber),
+      epochIndex: Number(epochIndex),
+      epochLength: Number(epochLength),
+      hash,
+      timestamp: Number(timestamp),
+      dao,
+      transactionCount: txCount,
+    };
 
-    block.hash = header.hash;
-    block.timestamp = Number(header.timestamp);
-
-    block.dao = header.dao;
-    block.transactionCount = txCount;
+    Object.assign(block, blockInfo);
     try {
       await block.save();
     } catch (err) {
@@ -81,52 +82,50 @@ export class CellService {
     }
   }
 
+  /**
+   * update spent transaction output
+   *
+   * @param height block number
+   * @param txIndex the transaction index in the block
+   * @param cellbase if the transaction is cellbase transaction
+   * @param hash transaction hash
+   * @param index the input index of tx inputs
+   * @param input the input data
+   * @param time block timestamp
+   */
   async kill(
-    height: Number,
-    txIndex: Number,
+    height: number,
+    txIndex: number,
     cellbase: boolean,
     hash: CKBComponents.Hash,
-    index: Number,
+    index: number,
     input: CKBComponents.CellInput,
     time,
   ) {
-    let oldWhere = {
+    const oldWhere = {
       hash: input.previousOutput.txHash,
       idx: Number(input.previousOutput.index).valueOf(),
       direction: true,
     };
-
-    let oldCell = await this.cellModel.findOne({
-      where: oldWhere,
-    });
+    const oldCell = await this.cellModel.findOne({ where: oldWhere });
 
     if (oldCell) {
       const cell = new Cell();
-      cell.blockNumber = height.valueOf();
-      cell.txIndex = txIndex.valueOf();
-      cell.hash = hash;
-      cell.idx = index.valueOf();
-      cell.direction = false;
-      cell.size = oldCell.size;
-      cell.typeId = oldCell.typeId;
-      cell.typeType = oldCell.typeType;
-      cell.typeArgs = oldCell.typeArgs;
-      cell.typeCode = oldCell.typeCode;
 
-      cell.lockId = oldCell.lockId;
-      cell.lockArgs = oldCell.lockArgs;
-      cell.lockCode = oldCell.lockCode;
-      cell.lockType = oldCell.lockType;
-      cell.dataLen = oldCell.dataLen;
-      cell.isLive = false;
-      cell.cellbase = cellbase;
-      cell.time = Number(this.ckb.utils.JSBI.BigInt(time).toString());
-      cell.rId = oldCell.id;
+      const { id, size, typeId, typeType, typeArgs, typeCode, lockId, lockArgs, lockCode, lockType, dataLen } = oldCell;
+      const newTime = Number(this.ckb.utils.JSBI.BigInt(time).toString());
+      const blockNumber = height;
+      const direction = false;
+      const isLive = false;
+      const idx = index;
+      const cellInfo = { blockNumber, txIndex, hash, idx, direction, size, typeId, typeType, typeArgs, typeCode };
+      Object.assign(cellInfo, { lockId, lockArgs, lockCode, lockType, dataLen, isLive, cellbase, time: newTime, rId: id});
+
       try {
+        Object.assign(cell, cellInfo);
         await cell.save();
 
-        oldCell.isLive = false;
-        oldCell.rId = cell.id;
+        Object.assign(oldCell, {isLive: false, rId: cell.id});
         await oldCell.save();
       } catch (err) {
         this.logger.error(`kill cell [${JSON.stringify(cell)}] err`, err, 'BLOCK_SYNC');
@@ -134,12 +133,24 @@ export class CellService {
     }
   }
 
+  /**
+   * save new unspent transaction output
+   *
+   * @param height block number
+   * @param txIndex the transaction index of the block
+   * @param cellbase if the transaction is cellbase
+   * @param hash transaction hash
+   * @param index the output index of the transaction
+   * @param output the output
+   * @param data the output data
+   * @param time the timestamp of block
+   */
   async born(
-    height: Number,
-    txIndex: Number,
+    height: number,
+    txIndex: number,
     cellbase: boolean,
     hash: CKBComponents.Hash,
-    index: Number,
+    index: number,
     output: CKBComponents.CellOutput,
     data: string,
     time: string,
@@ -175,10 +186,20 @@ export class CellService {
     }
   }
 
-  async liveCount(): Promise<Number> {
+  /**
+   * calculate count of live cells
+   */
+  async liveCount(): Promise<number> {
     return await this.cellModel.count({ where: { isLive: true } });
   }
 
+  /**
+   * pick live cells for transfer CKBytes
+   *
+   * @param lockHash lock script hash
+   * @param totalCapacity the amount of transfer CKBytes
+   * @param lastId the last id of last returned result
+   */
   async pickLiveCellForTransfer(
     lockHash: string,
     totalCapacity: string,
@@ -186,13 +207,7 @@ export class CellService {
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
-    let condition = {
-      lockId: lockHash,
-      isLive: true,
-      typeId: '',
-      dataLen: 0,
-      direction: 1,
-    };
+    const condition = { lockId: lockHash, isLive: true, typeId: '', dataLen: 0, direction: 1 };
 
     let cellbase = false;
     if (lastId > 0) {
@@ -200,29 +215,25 @@ export class CellService {
       if (lastCell) {
         cellbase = lastCell.cellbase;
       }
-      condition['id'] = { [Op.gt]: lastId };
+      Object.assign(condition, {id: { [Op.gt]: lastId } });
+      // condition['id'] = { [Op.gt]: lastId };
     }
 
     const costCapacity = add(BigInt(totalCapacity), BigInt(62 * 10 ** 8));
     let inputCapacity = BigInt(0);
-    let selectedCells = [];
+    const selectedCells = [];
     let offset = 0;
 
     while (true) {
       const liveCells = await this.cellModel.findAll({
-        where: {
-          ...condition,
-          cellbase,
-        },
+        where: { ...condition, cellbase },
         order: [['id', 'asc']],
         limit: 1000,
         offset,
       });
 
-      for (let i = 0; i < liveCells.length; i++) {
-        const c = liveCells[i];
+      for (const c of liveCells) {
         inputCapacity = add(inputCapacity, BigInt(c.size));
-
         selectedCells.push(c);
         if (greaterThan(inputCapacity, costCapacity)) {
           break;
@@ -239,7 +250,10 @@ export class CellService {
         } else {
           cellbase = true;
           offset = 0;
-          delete condition['id'];
+          if (Object.keys(condition).includes('id')) {
+            const prop = 'id';
+            delete condition[prop];
+          }
           continue;
         }
       }
@@ -249,12 +263,16 @@ export class CellService {
     return selectedCells;
   }
 
-  async getEthDeps(keccak_tx_hash) {
+  /**
+   * returns celldeps for CKB transaction
+   * @param keccakTxHash
+   */
+  async getEthDeps(keccakTxHash) {
     const cell = await this.cellModel.findOne({
       where: { blockNumber: 0, txIndex: 0, idx: 1 },
     });
 
-    let deps = [
+    const deps = [
       {
         depType: 'code',
         outPoint: {
@@ -265,7 +283,7 @@ export class CellService {
       {
         depType: 'code',
         outPoint: {
-          txHash: keccak_tx_hash,
+          txHash: keccakTxHash,
           index: '0x0',
         },
       },
@@ -273,6 +291,9 @@ export class CellService {
     return deps;
   }
 
+  /**
+   * returns Secp256k1 Cell for CKB transaction
+   */
   async loadSecp256k1Cell() {
     const cell1 = await this.cellModel.findOne({
       where: { blockNumber: 0, txIndex: 1 },
@@ -290,6 +311,9 @@ export class CellService {
     };
   }
 
+  /**
+   * returns Dao Cell for DAO transaction
+   */
   async loadDaoCell() {
     const daoCodeHash = '';
     const cell = await this.cellModel.findOne({
@@ -310,6 +334,14 @@ export class CellService {
     };
   }
 
+  /**
+   * get cells by condition
+   *
+   * @param conditions
+   * @param offset
+   * @param limit
+   * @param order
+   */
   async loadCells(
     conditions,
     offset: number,
@@ -325,36 +357,45 @@ export class CellService {
     return cells;
   }
 
+  /**
+   * returns tx list by lockscript hash, direction and limit
+   *
+   * @param lockHash lock script hash
+   * @param direction for the lockHash, if the tx is add or sub CKBytes
+   * @param limit
+   * @param lastHash
+   */
   async loadTxByConditions(
     lockHash: string,
     direction: string,
     limit: number,
     lastHash: string,
   ) {
-    let conditions = {
+    // build conditions for database query
+    const conditions = {
       lockId: lockHash,
     };
 
-    let fullTxs = [];
-
+    const fullTxs = [];
     let lastId = 999999999999;
     if (!lastHash) {
+      this.logger.info('lastHash is empty', CellService.name);
     } else {
       lastId = await this.cellModel.min('id', {
         where: { lockId: lockHash, hash: lastHash },
       });
     }
 
-    if (direction == 'in') {
-      conditions['direction'] = 1;
-    } else if (direction == 'out') {
-      conditions['direction'] = 0;
-    } else {
+    if (direction === 'in') {
+      Object.assign(conditions, { direction: 1 });
+    } else if (direction === 'out') {
+      Object.assign(conditions, { direction: 0 });
     }
 
+    // fetch tx list meet the conditions from db, if returned size < 5, repeat the steps to fetch again until the total size >= limit.
     while (true) {
       if (lastId < 999999999999) {
-        conditions['id'] = { [Op.lt]: lastId };
+        Object.assign(conditions, { id: { [Op.lt]: lastId } });
       }
 
       this.logger.info(`condition is ${JSON.stringify(conditions)}`, CellService.name);
@@ -367,8 +408,9 @@ export class CellService {
       });
 
       let txhashList = results.map(x => {
-        let item = x.get({ plain: true });
-        return item['hash'];
+        const item = x.get({ plain: true });
+        const key = 'hash';
+        return item[key];
       });
 
       if (txhashList.length === 0) {
@@ -389,13 +431,13 @@ export class CellService {
         order: [['id', 'desc']],
       });
 
-      for (let hash of txhashList) {
+      for (const hash of txhashList) {
         const tx = this.buildTx(allInputCells, allOutputCells, hash, lockHash);
 
         if (
-          (direction == 'in' && tx.direction == 'in') ||
-          (direction == 'out' && tx.direction == 'out') ||
-          (direction != 'in' && direction != 'out')
+          (direction === 'in' && tx.direction === 'in') ||
+          (direction === 'out' && tx.direction === 'out') ||
+          (direction !== 'in' && direction !== 'out')
         ) {
           fullTxs.push(tx);
         }
@@ -420,6 +462,13 @@ export class CellService {
     return fullTxs;
   }
 
+  /**
+   * calculate transaction type by input cells and output cells
+   * if transaction is dao related, return dao-deposit/dao-withdraw1/dao-withdraw2
+   *
+   * @param inputCells input cell
+   * @param outputCells output cell
+   */
   getTxType(inputCells, outputCells) {
     let inputType = null;
     let inputAmount = 0;
@@ -457,26 +506,34 @@ export class CellService {
     return { type, daoAmount };
   }
 
+  /**
+   * Build a CKB transaction from input cells, output cells and lockscript hash
+   *
+   * @param allInputCells input cells of transaction
+   * @param allOutputCells output cells of transaction
+   * @param hash transaction hash
+   * @param lockHash lockscript hash
+   */
   buildTx(allInputCells, allOutputCells, hash, lockHash) {
-    this.logger.info(`start build tx: ${hash} `)
-    let txInputCells = allInputCells
+    this.logger.info(`start build tx: ${hash} `);
+
+    const { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
+    const txInputCells = allInputCells
       .filter(x => x.hash === hash)
       .sort((a, b) => a.idx - b.idx);
 
-    let txOutputCells = allOutputCells
+    const txOutputCells = allOutputCells
       .filter(x => x.hash === hash)
       .sort((a, b) => a.idx - b.idx);
-    
-    this.logger.info(`txInputCells.length = [${txInputCells.length}], txOutputCells.length = [${txOutputCells.length}]`);
+
+    this.logger.info(
+      `txInputCells.length = [${txInputCells.length}], txOutputCells.length = [${txOutputCells.length}]`,
+    );
 
     const { type, daoAmount } = this.getTxType(txInputCells, txOutputCells);
-
-    let time = txOutputCells[0].time;
-
-    let { BigInt, add, subtract, greaterThan } = this.ckb.utils.JSBI;
-
-    let userInputCells = txInputCells.filter(c => c.lockId == lockHash);
-    let userOutputCells = txOutputCells.filter(c => c.lockId == lockHash);
+    const time = txOutputCells[0].time;
+    const userInputCells = txInputCells.filter(c => c.lockId === lockHash);
+    const userOutputCells = txOutputCells.filter(c => c.lockId === lockHash);
 
     const inAmount =
       userInputCells.length > 0
@@ -487,22 +544,17 @@ export class CellService {
         ? userOutputCells.map(c => BigInt(c.size)).reduce(add)
         : BigInt(0);
 
-    let direction, amount;
-    let inputSize = txInputCells.length;
-    let outputSize = txOutputCells.length;
+    let direction;
+    let amount;
+    const inputSize = txInputCells.length;
+    const outputSize = txOutputCells.length;
 
-    let prefix =
-      this.ckbService.getChain() == 'ckb'
-        ? AddressPrefix.Mainnet
-        : AddressPrefix.Testnet;
+    const prefix = this.ckbService.getChain() === 'ckb' ? AddressPrefix.Mainnet : AddressPrefix.Testnet;
 
-    let from =
-      txInputCells.length > 0
-        ? getCellAddress(txInputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID)
-        : 'cellbase';
-    let to = getCellAddress(txOutputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID);
+    const from = txInputCells.length > 0 ? getCellAddress(txInputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID) : 'cellbase';
+    const to = getCellAddress(txOutputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID);
 
-    let blockNumber = txOutputCells[0].blockNumber;
+    const blockNumber = txOutputCells[0].blockNumber;
 
     if (greaterThan(outAmount, inAmount)) {
       direction = 'in';
@@ -512,34 +564,26 @@ export class CellService {
       amount = '0x' + subtract(inAmount, outAmount).toString(16);
     }
 
-    if(type === 'dao-withdraw2') {
+    if (type === 'dao-withdraw2') {
       amount = '0x' + outAmount.toString(16);
     }
-    if(type === 'dao-deposit' || type === 'dao-withdraw1'){
-      amount = '0x' +BigInt(daoAmount).toString(16);
+    if (type === 'dao-deposit' || type === 'dao-withdraw1') {
+      amount = '0x' + BigInt(daoAmount).toString(16);
     }
 
     this.logger.info(`TX [${hash}] ${from} -> ${to} : ${amount}`);
 
-
-    const result = {
-      hash,
-      time,
-      from,
-      to,
-      type,
-      amount,
-      direction,
-      blockNumber,
-      inputSize,
-      outputSize,
-    };
-    this.logger.info(`finish buildTx: [${JSON.stringify(result)}]`)
+    const result = { hash, time, from, to, type, amount, direction, blockNumber, inputSize, outputSize };
+    this.logger.info(`finish buildTx: [${JSON.stringify(result)}]`);
     return result;
   }
 
+  /**
+   * return total capacity according to the lock script hash
+   * @param lockHash lock script hash
+   */
   async getCapacityByLockHash(lockHash) {
-    let capacity = await this.cellModel.sum('size', {
+    const capacity = await this.cellModel.sum('size', {
       where: { lockId: lockHash, typeId: '', isLive: true, direction: true },
     });
     return '0x' + capacity.toString(16);

@@ -3,7 +3,7 @@ import { Interval, NestSchedule } from 'nest-schedule';
 import { CkbService } from '../ckb/ckb.service';
 import { CellService } from 'src/cell/cell.service';
 import { SyncStat } from './syncstat.entity';
-import {SYNCSTAT_REPOSITORY} from '../util/constant'
+import {SYNCSTAT_REPOSITORY} from '../util/constant';
 import { LoggerService } from 'nest-logger';
 
 @Injectable()
@@ -24,8 +24,12 @@ export class BlockService extends NestSchedule {
   private syncing = false;
   private syncingBlock = 0;
 
+  /**
+   * sync ckb chain data from ckb node. start a new sync every 5 seconds.
+   */
   @Interval(5 * 1000)
   async sync() {
+    // if it is syncing data right now, skip starting new sync
     if (this.syncing) {
       this.logger.info(`Sync Skipped, current is syncing [${this.syncingBlock}]`, 'BLOCK_SYNC');
       await this.updateTip(this.syncingBlock);
@@ -43,19 +47,28 @@ export class BlockService extends NestSchedule {
       this.syncingBlock = lastTip;
     }
 
+    // processing blocks from the last syncing block to the latest block of chain.
     for (let i = lastTip + 1; i <= currentTip; i++) {
       await this.cellService.extractFromBlock(i);
       this.syncingBlock = i;
-      i === currentTip &&
-        this.logger.info(`Synced block from [${lastTip + 1}] to [${currentTip}]`, 'BLOCK_SYNC');
+      if (i === currentTip) {
+        this.logger.info(
+          `Synced block from [${lastTip + 1}] to [${currentTip}]`,
+          'BLOCK_SYNC',
+        );
+      }
     }
 
     await this.updateTip(currentTip);
     this.syncing = false;
   }
 
-  async updateTip(tip: Number): Promise<any> {
-    let blocks = await this.syncStatModel.findAll();
+  /**
+   * update last syncing block
+   * @param tip block number
+   */
+  async updateTip(tip: number): Promise<any> {
+    const blocks = await this.syncStatModel.findAll();
     let block;
     if (blocks.length > 0) {
       block = blocks[0];
@@ -69,24 +82,40 @@ export class BlockService extends NestSchedule {
     return { block };
   }
 
+  /**
+   * get the last syncing block info
+   */
   async getLastestBlock(): Promise<SyncStat> {
-    let blocks = await this.syncStatModel.findAll();
+    const blocks = await this.syncStatModel.findAll();
     return blocks.length > 0 ? blocks[0] : null;
   }
 
+  /**
+   * get the latest block header on CKB chain
+   */
   async getTipBlockHeader(): Promise<CKBComponents.BlockHeader> {
     return await this.ckb.rpc.getTipHeader();
   }
-  async getBlockByNumber(height: Number): Promise<CKBComponents.Block> {
-    let hexHeight = '0x' + height.toString(16);
+
+  /**
+   * get block info with block height
+   * @param height block number
+   *
+   * @returns block info
+   */
+  async getBlockByNumber(height: number): Promise<CKBComponents.Block> {
+    const hexHeight = '0x' + height.toString(16);
     return await this.ckb.rpc.getBlockByNumber(hexHeight);
   }
 
+  /**
+   * get the best transaction fee rate currently.
+   */
   async getFeeRate(): Promise<CKBComponents.FeeRate> {
-    let feeRate: CKBComponents.FeeRate = {feeRate: '1000'};
-    try{
+    let feeRate: CKBComponents.FeeRate = { feeRate: '1000' };
+    try {
       feeRate = await this.ckb.rpc.estimateFeeRate('0x3');
-    }catch(err){
+    } catch (err) {
       this.logger.error('estimateFeeRate error', err, BlockService.name);
     }
     return feeRate;

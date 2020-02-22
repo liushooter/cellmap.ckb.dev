@@ -1,5 +1,5 @@
 import { SyncStat } from './syncstat.entity';
-import {SYNCSTAT_REPOSITORY} from '../util/constant'
+import {SYNCSTAT_REPOSITORY} from '../util/constant';
 
 export const blocksProviders = [
   {
