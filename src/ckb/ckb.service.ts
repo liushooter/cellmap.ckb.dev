@@ -11,7 +11,6 @@ export class CkbService {
   private chain: string;
 
   constructor(private readonly config: ConfigService) {
-
     this.ckb = new Core(this.config.CKB_RPC_ENDPOINT);
     this.chain = 'ckb';
 
@@ -23,7 +22,6 @@ export class CkbService {
       // console.log('connect CKB chain rpc response', result);
       this.chain = result.chain;
     });
-
   }
 
   /**

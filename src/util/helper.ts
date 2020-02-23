@@ -1,4 +1,8 @@
-import { AddressType, bech32Address, fullPayloadToAddress } from '@nervosnetwork/ckb-sdk-utils';
+import {
+  AddressType,
+  bech32Address,
+  fullPayloadToAddress,
+} from '@nervosnetwork/ckb-sdk-utils';
 import { BLOCK_ASSEMBLER_CODE } from './constant';
 
 export const getCellAddress = (cell, prefix, ETH_LOCK_TYPE_ID) => {
@@ -29,11 +33,14 @@ export const getCellAddress = (cell, prefix, ETH_LOCK_TYPE_ID) => {
 
 export const uniqArray = array => {
   const res = [array[0]];
-  for (const item of array) { // 每次从原数组取一个
+  for (const item of array) {
+    // 每次从原数组取一个
 
     let matched = false;
-    for (const resItem of res) { // 将这个元素与res中每个元素对比
-      if (item === resItem) { // 若匹配成功，打断第i次的内部循环
+    for (const resItem of res) {
+      // 将这个元素与res中每个元素对比
+      if (item === resItem) {
+        // 若匹配成功，打断第i次的内部循环
         matched = true;
         break;
       }
@@ -52,7 +59,7 @@ export const hexDataOccupiedBytes = hexString => {
   return (hexString.length - 2) / 2;
 };
 
-export const scriptOccupiedBytes = (script) => {
+export const scriptOccupiedBytes = script => {
   if (script !== undefined && script !== null) {
     return (
       1 +
@@ -64,7 +71,7 @@ export const scriptOccupiedBytes = (script) => {
   return 0;
 };
 
-export const cellOccupiedBytes = (cell) => {
+export const cellOccupiedBytes = cell => {
   return (
     8 +
     hexDataOccupiedBytes(cell.data) +

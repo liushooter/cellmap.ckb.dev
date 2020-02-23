@@ -1,5 +1,12 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_ID, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
+import {
+  CELLS_REPOSITORY,
+  SYNCSTAT_REPOSITORY,
+  BLOCKS_REPOSITORY,
+  DAO_TYPE_ID,
+  GENESIS_BLOCK_TIMESTAMP,
+  MILLISECONDS_IN_YEAR,
+} from 'src/util/constant';
 import { Cell } from 'src/cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
 import { Block } from 'src/cell/block.entity';
@@ -139,9 +146,7 @@ export class DaoService {
     const daoHex = dao.replace('0x', '');
 
     const totalIssued = BigInt(fromHexInLittleEndian(daoHex.slice(0, 16)));
-    const accumulatedRate = BigInt(
-      fromHexInLittleEndian(daoHex.slice(16, 32)),
-    );
+    const accumulatedRate = BigInt(fromHexInLittleEndian(daoHex.slice(16, 32)));
     const totalUnissued = BigInt(fromHexInLittleEndian(daoHex.slice(32, 48)));
     const occupiedCapacity = BigInt(
       fromHexInLittleEndian(daoHex.slice(48, 64)),

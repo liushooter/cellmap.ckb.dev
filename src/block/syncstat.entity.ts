@@ -1,4 +1,13 @@
-import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
+import {
+  Column,
+  Model,
+  Table,
+  Index,
+  PrimaryKey,
+  DataType,
+  Default,
+  AutoIncrement,
+} from 'sequelize-typescript';
 
 @Table
 export class SyncStat extends Model<SyncStat> {

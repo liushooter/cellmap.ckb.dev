@@ -26,7 +26,9 @@ export class CellService {
    * @param height block number
    */
   async extractFromBlock(height: number) {
-    const block = await this.ckb.rpc.getBlockByNumber('0x' + height.toString(16));
+    const block = await this.ckb.rpc.getBlockByNumber(
+      '0x' + height.toString(16),
+    );
 
     await this.saveBlockHeader(block.header, block.transactions.length);
 
@@ -46,9 +48,21 @@ export class CellService {
 
       // update the unspent outputs
       const outputs = tx.outputs.map(async (output, index) =>
-        this.born(height, i, cellbase, tx.hash, index, output, tx.outputsData[index], timestamp),
+        this.born(
+          height,
+          i,
+          cellbase,
+          tx.hash,
+          index,
+          output,
+          tx.outputsData[index],
+          timestamp,
+        ),
       );
-      await Promise.all([ await Promise.all(inputs), await Promise.all(outputs) ]);
+      await Promise.all([
+        await Promise.all(inputs),
+        await Promise.all(outputs),
+      ]);
     }
   }
 
@@ -61,7 +75,11 @@ export class CellService {
   async saveBlockHeader(header: CKBComponents.BlockHeader, txCount: number) {
     const block = new Block();
     const { number, epoch, hash, timestamp, dao } = header;
-    const {number: epochNumber, index: epochIndex, length: epochLength} = this.ckb.utils.parseEpoch(epoch);
+    const {
+      number: epochNumber,
+      index: epochIndex,
+      length: epochLength,
+    } = this.ckb.utils.parseEpoch(epoch);
 
     const blockInfo = {
       number: Number(number),
@@ -78,7 +96,11 @@ export class CellService {
     try {
       await block.save();
     } catch (err) {
-      this.logger.error(`saveBlockHeader [${JSON.stringify(block)}] err`, err, 'BLOCK_SYNC');
+      this.logger.error(
+        `saveBlockHeader [${JSON.stringify(block)}] err`,
+        err,
+        'BLOCK_SYNC',
+      );
     }
   }
 
@@ -112,23 +134,60 @@ export class CellService {
     if (oldCell) {
       const cell = new Cell();
 
-      const { id, size, typeId, typeType, typeArgs, typeCode, lockId, lockArgs, lockCode, lockType, dataLen } = oldCell;
+      const {
+        id,
+        size,
+        typeId,
+        typeType,
+        typeArgs,
+        typeCode,
+        lockId,
+        lockArgs,
+        lockCode,
+        lockType,
+        dataLen,
+      } = oldCell;
       const newTime = Number(this.ckb.utils.JSBI.BigInt(time).toString());
       const blockNumber = height;
       const direction = false;
       const isLive = false;
       const idx = index;
-      const cellInfo = { blockNumber, txIndex, hash, idx, direction, size, typeId, typeType, typeArgs, typeCode };
-      Object.assign(cellInfo, { lockId, lockArgs, lockCode, lockType, dataLen, isLive, cellbase, time: newTime, rId: id});
+      const cellInfo = {
+        blockNumber,
+        txIndex,
+        hash,
+        idx,
+        direction,
+        size,
+        typeId,
+        typeType,
+        typeArgs,
+        typeCode,
+      };
+      Object.assign(cellInfo, {
+        lockId,
+        lockArgs,
+        lockCode,
+        lockType,
+        dataLen,
+        isLive,
+        cellbase,
+        time: newTime,
+        rId: id,
+      });
 
       try {
         Object.assign(cell, cellInfo);
         await cell.save();
 
-        Object.assign(oldCell, {isLive: false, rId: cell.id});
+        Object.assign(oldCell, { isLive: false, rId: cell.id });
         await oldCell.save();
       } catch (err) {
-        this.logger.error(`kill cell [${JSON.stringify(cell)}] err`, err, 'BLOCK_SYNC');
+        this.logger.error(
+          `kill cell [${JSON.stringify(cell)}] err`,
+          err,
+          'BLOCK_SYNC',
+        );
       }
     }
   }
@@ -182,7 +241,11 @@ export class CellService {
     try {
       await cell.save();
     } catch (err) {
-      this.logger.error(`born cell [${JSON.stringify(cell)}] err`, err, 'BLOCK_SYNC');
+      this.logger.error(
+        `born cell [${JSON.stringify(cell)}] err`,
+        err,
+        'BLOCK_SYNC',
+      );
     }
   }
 
@@ -207,7 +270,13 @@ export class CellService {
   ): Promise<Cell[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
-    const condition = { lockId: lockHash, isLive: true, typeId: '', dataLen: 0, direction: 1 };
+    const condition = {
+      lockId: lockHash,
+      isLive: true,
+      typeId: '',
+      dataLen: 0,
+      direction: 1,
+    };
 
     let cellbase = false;
     if (lastId > 0) {
@@ -215,7 +284,7 @@ export class CellService {
       if (lastCell) {
         cellbase = lastCell.cellbase;
       }
-      Object.assign(condition, {id: { [Op.gt]: lastId } });
+      Object.assign(condition, { id: { [Op.gt]: lastId } });
       // condition['id'] = { [Op.gt]: lastId };
     }
 
@@ -273,20 +342,8 @@ export class CellService {
     });
 
     const deps = [
-      {
-        depType: 'code',
-        outPoint: {
-          txHash: cell.hash,
-          index: '0x3',
-        },
-      },
-      {
-        depType: 'code',
-        outPoint: {
-          txHash: keccakTxHash,
-          index: '0x0',
-        },
-      },
+      { depType: 'code', outPoint: { txHash: cell.hash, index: '0x3' } },
+      { depType: 'code', outPoint: { txHash: keccakTxHash, index: '0x0' } },
     ];
     return deps;
   }
@@ -304,10 +361,7 @@ export class CellService {
     return {
       hashType: 'type',
       codeHash: cell2.typeId,
-      outPoint: {
-        txHash: cell1.hash,
-        index: '0x0',
-      },
+      outPoint: { txHash: cell1.hash, index: '0x0' },
     };
   }
 
@@ -398,7 +452,10 @@ export class CellService {
         Object.assign(conditions, { id: { [Op.lt]: lastId } });
       }
 
-      this.logger.info(`condition is ${JSON.stringify(conditions)}`, CellService.name);
+      this.logger.info(
+        `condition is ${JSON.stringify(conditions)}`,
+        CellService.name,
+      );
 
       const results = await this.cellModel.findAll({
         attributes: [[fn('DISTINCT', col('hash')), 'hash'], 'blockNumber'],
@@ -419,7 +476,10 @@ export class CellService {
 
       txhashList = uniqArray(txhashList);
 
-      this.logger.info(`txHashList ${JSON.stringify(txhashList)}`, CellService.name);
+      this.logger.info(
+        `txHashList ${JSON.stringify(txhashList)}`,
+        CellService.name,
+      );
 
       const allOutputCells = await this.cellModel.findAll({
         where: { hash: { [Op.in]: txhashList }, direction: true },
@@ -549,10 +609,20 @@ export class CellService {
     const inputSize = txInputCells.length;
     const outputSize = txOutputCells.length;
 
-    const prefix = this.ckbService.getChain() === 'ckb' ? AddressPrefix.Mainnet : AddressPrefix.Testnet;
+    const prefix =
+      this.ckbService.getChain() === 'ckb'
+        ? AddressPrefix.Mainnet
+        : AddressPrefix.Testnet;
 
-    const from = txInputCells.length > 0 ? getCellAddress(txInputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID) : 'cellbase';
-    const to = getCellAddress(txOutputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID);
+    const from =
+      txInputCells.length > 0
+        ? getCellAddress(txInputCells[0], prefix, this.config.ETH_LOCK_TYPE_ID)
+        : 'cellbase';
+    const to = getCellAddress(
+      txOutputCells[0],
+      prefix,
+      this.config.ETH_LOCK_TYPE_ID,
+    );
 
     const blockNumber = txOutputCells[0].blockNumber;
 
@@ -573,7 +643,18 @@ export class CellService {
 
     this.logger.info(`TX [${hash}] ${from} -> ${to} : ${amount}`);
 
-    const result = { hash, time, from, to, type, amount, direction, blockNumber, inputSize, outputSize };
+    const result = {
+      hash,
+      time,
+      from,
+      to,
+      type,
+      amount,
+      direction,
+      blockNumber,
+      inputSize,
+      outputSize,
+    };
     this.logger.info(`finish buildTx: [${JSON.stringify(result)}]`);
     return result;
   }

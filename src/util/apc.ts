@@ -16,12 +16,21 @@ const capacityAtYearNumber = (yearNumber: number) => {
   for (let i = 0; i < yearIndex; i++) {
     base += (ANNUAL_PRIMARY_ISSUANCE_BASE * YEARS_IN_PERIOD) / 2 ** i;
   }
-  base += (ANNUAL_PRIMARY_ISSUANCE_BASE * (yearNumber - yearIndex * YEARS_IN_PERIOD)) / 2 ** yearIndex;
+  base +=
+    (ANNUAL_PRIMARY_ISSUANCE_BASE *
+      (yearNumber - yearIndex * YEARS_IN_PERIOD)) /
+    2 ** yearIndex;
   base += SECONDARY_ISSUANCE_BASE * yearNumber;
   return base;
 };
 
-const apcInPeriod = ({ startYearNumber, endYearNumber }: { startYearNumber: number; endYearNumber: number }) => {
+const apcInPeriod = ({
+  startYearNumber,
+  endYearNumber,
+}: {
+  startYearNumber: number;
+  endYearNumber: number;
+}) => {
   const capacity = capacityAtYearNumber(startYearNumber);
   const alpha = alphaAtYearNumber(startYearNumber);
   const sn = SECONDARY_ISSUANCE_BASE * (endYearNumber - startYearNumber);
@@ -30,11 +39,16 @@ const apcInPeriod = ({ startYearNumber, endYearNumber }: { startYearNumber: numb
 };
 
 const calculateAPC = (
-  { startYearNumber, endYearNumber }: { startYearNumber: number; endYearNumber: number },
+  {
+    startYearNumber,
+    endYearNumber,
+  }: { startYearNumber: number; endYearNumber: number },
   scale: boolean = true,
 ) => {
   if (endYearNumber < startYearNumber) {
-    throw new Error('End year number should not be less than start year number');
+    throw new Error(
+      'End year number should not be less than start year number',
+    );
   }
   let ratio = endYearNumber - startYearNumber;
   let scaledEndYearNumber = endYearNumber;
@@ -42,8 +56,10 @@ const calculateAPC = (
     scaledEndYearNumber = startYearNumber + 1;
     ratio = 1;
   }
-  const checkpointStart = Math.ceil(startYearNumber / YEARS_IN_PERIOD) * YEARS_IN_PERIOD;
-  const checkpointEnd = Math.floor(scaledEndYearNumber / YEARS_IN_PERIOD) * YEARS_IN_PERIOD;
+  const checkpointStart =
+    Math.ceil(startYearNumber / YEARS_IN_PERIOD) * YEARS_IN_PERIOD;
+  const checkpointEnd =
+    Math.floor(scaledEndYearNumber / YEARS_IN_PERIOD) * YEARS_IN_PERIOD;
   const checkpoints = Array.from(
     {
       length: (checkpointEnd - checkpointStart) / YEARS_IN_PERIOD + 1,
@@ -63,9 +79,10 @@ const calculateAPC = (
       endYearNumber: yearNumber,
     });
   });
-  const rate = rates.reduce((accumulatedRate, r) => accumulatedRate * (1 + r), 1) - 1;
-//   return +((rate * 100) / ratio).toFixed(2)
-  return +((rate ) / ratio).toFixed(4);
+  const rate =
+    rates.reduce((accumulatedRate, r) => accumulatedRate * (1 + r), 1) - 1;
+  //   return +((rate * 100) / ratio).toFixed(2)
+  return +(rate / ratio).toFixed(4);
 };
 
 export default calculateAPC;

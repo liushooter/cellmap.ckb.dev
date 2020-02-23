@@ -3,13 +3,12 @@ import { Interval, NestSchedule } from 'nest-schedule';
 import { CkbService } from '../ckb/ckb.service';
 import { CellService } from 'src/cell/cell.service';
 import { SyncStat } from './syncstat.entity';
-import {SYNCSTAT_REPOSITORY} from '../util/constant';
+import { SYNCSTAT_REPOSITORY } from '../util/constant';
 import { LoggerService } from 'nest-logger';
 
 @Injectable()
 export class BlockService extends NestSchedule {
   constructor(
-
     @Inject(SYNCSTAT_REPOSITORY)
     private readonly syncStatModel: typeof SyncStat,
     private readonly ckbService: CkbService,
@@ -31,7 +30,10 @@ export class BlockService extends NestSchedule {
   async sync() {
     // if it is syncing data right now, skip starting new sync
     if (this.syncing) {
-      this.logger.info(`Sync Skipped, current is syncing [${this.syncingBlock}]`, 'BLOCK_SYNC');
+      this.logger.info(
+        `Sync Skipped, current is syncing [${this.syncingBlock}]`,
+        'BLOCK_SYNC',
+      );
       await this.updateTip(this.syncingBlock);
       return;
     }
