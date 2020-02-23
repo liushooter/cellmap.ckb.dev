@@ -28,6 +28,7 @@
         "@nestjs/platform-express": "^6.10.11",
         "dotenv": "^8.2.0",
         "mysql2": "^2.1.0",
+        "nest-logger": "^5.0.0",
         "nest-schedule": "^0.6.3",
         "reflect-metadata": "^0.1.13",
         "rimraf": "^3.0.0",

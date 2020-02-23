@@ -4,9 +4,10 @@ import { DaoService } from './dao.service';
 import { cellsProviders } from '../cell/cells.providers';
 import { DatabaseModule } from '../database/database.module';
 import { blocksProviders } from '../block/blocks.providers';
+import { LoggerModule } from 'src/logger/logger.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [DaoController],
   providers: [DaoService, ...cellsProviders, ...blocksProviders],
 })

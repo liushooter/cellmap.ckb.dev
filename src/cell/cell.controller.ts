@@ -1,11 +1,20 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Injectable } from '@nestjs/common';
 import { CellService } from './cell.service';
-import { ETH_LOCK_CODE, ETH_TX_HASH, EMPTY_HASH, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
-import apc from 'src/util/apc'
+import {
+  EMPTY_HASH,
+  GENESIS_BLOCK_TIMESTAMP,
+  MILLISECONDS_IN_YEAR,
+} from 'src/util/constant';
+import { ConfigService } from '../config/config.service';
+import apc from 'src/util/apc';
 
+@Injectable()
 @Controller('cell')
 export class CellController {
-  constructor(private readonly cellService: CellService) {}
+  constructor(
+    private readonly cellService: CellService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Get('live')
   async countLive() {
@@ -22,55 +31,13 @@ export class CellController {
     if (!capacity) {
       throw new Error('param capacity is invalid');
     }
-    // console.log(lockHash, capacity);
 
     const cells = await this.cellService.pickLiveCellForTransfer(
       lockHash,
       capacity,
       lastId,
     );
-
-    let formatedCells = cells.map(cell => {
-      const blockHash = '';
-      const lock = {
-        codeHash: cell.lockCode,
-        hashType: cell.lockType,
-        args: cell.lockArgs,
-      };
-      const outPoint = {
-        txHash: cell.hash,
-        index: '0x' + cell.idx.toString(16),
-      };
-      const outputDataLen = '0x' + cell.dataLen.toString(16);
-
-      const capacity = cell.size;
-      const cellbase = cell.cellbase;
-      const id = cell.id;
-      const type =
-        cell.typeId === ''
-          ? null
-          : {
-              codeHash: cell.typeCode,
-              hashType: cell.typeType,
-              args: cell.typeArgs,
-            };
-
-      const dataHash = EMPTY_HASH;
-        
-      const status = 'live';
-      return {
-        id,
-        blockHash,
-        lock,
-        outPoint,
-        outputDataLen,
-        capacity,
-        cellbase,
-        type,
-        dataHash,
-        status,
-      };
-    });
+    const formatedCells = cells.map(cell => this.formatCell(cell));
     return formatedCells;
   }
 
@@ -81,8 +48,8 @@ export class CellController {
     @Query('size') size,
     @Query('type') type,
   ) {
-    size = size > 0 ? parseInt(size) : 20;
-    let cells = await this.cellService.loadTxByConditions(
+    size = size > 0 ? Number(size) : 20;
+    const cells = await this.cellService.loadTxByConditions(
       lockHash,
       type,
       size,
@@ -104,25 +71,70 @@ export class CellController {
 
   @Get('getConfig')
   async getConfig() {
-    let keccak_code_hash = ETH_LOCK_CODE;
-    let keccak_tx_hash = ETH_TX_HASH;
-    let cellDeps = await this.cellService.getEthDeps(keccak_tx_hash);
+    const keccakCodeHash = this.config.ETH_LOCK_TYPE_ID;
+    const keccakTxHash = this.config.ETH_LOCK_TX_HASH;
+    const cellDeps = await this.cellService.getEthDeps(keccakCodeHash);
 
-    const startYearNumber = (+new Date().getTime() - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
+    const startYearNumber =
+      (+new Date().getTime() - +(GENESIS_BLOCK_TIMESTAMP || 0)) /
+      MILLISECONDS_IN_YEAR;
     const endYearNumber = startYearNumber + 1;
 
-    const rate = apc({startYearNumber, endYearNumber});
+    const rate = apc({ startYearNumber, endYearNumber });
 
     return {
-      keccak_code_hash,
-      keccak_tx_hash,
+      keccak_code_hash: keccakCodeHash,
+      keccak_tx_hash: keccakTxHash,
       cellDeps,
-      apc: rate
+      apc: rate,
     };
   }
 
   @Get('getCapacityByLockHash')
-  async getCapacityByLockHash(@Query('lockHash') lockHash){
-      return await this.cellService.getCapacityByLockHash(lockHash);
+  async getCapacityByLockHash(@Query('lockHash') lockHash) {
+    return await this.cellService.getCapacityByLockHash(lockHash);
+  }
+
+  formatCell(cell) {
+    const blockHash = '';
+
+    const {
+      hash,
+      idx,
+      lockCode,
+      dataLen,
+      lockType,
+      lockArgs,
+      cellbase,
+      id,
+      typeId,
+      typeCode,
+      typeType,
+      typeArgs,
+      size,
+    } = cell;
+    const lock = { codeHash: lockCode, hashType: lockType, args: lockArgs };
+    const outPoint = { txHash: hash, index: '0x' + idx.toString(16) };
+    const outputDataLen = '0x' + dataLen.toString(16);
+
+    const type =
+      typeId === ''
+        ? null
+        : { codeHash: typeCode, hashType: typeType, args: typeArgs };
+    const dataHash = EMPTY_HASH;
+
+    const status = 'live';
+    return {
+      id,
+      blockHash,
+      lock,
+      outPoint,
+      outputDataLen,
+      capacity: size,
+      cellbase,
+      type,
+      dataHash,
+      status,
+    };
   }
 }

@@ -1,8 +1,16 @@
-import { Column, Model, Table, Index, PrimaryKey, DataType, Default, AutoIncrement} from 'sequelize-typescript';
-
+import {
+  Column,
+  Model,
+  Table,
+  Index,
+  PrimaryKey,
+  DataType,
+  Default,
+  AutoIncrement,
+} from 'sequelize-typescript';
 
 @Table
-export class SyncStat extends Model<SyncStat>{
+export class SyncStat extends Model<SyncStat> {
   @PrimaryKey
   @AutoIncrement
   @Column
@@ -10,5 +18,4 @@ export class SyncStat extends Model<SyncStat>{
 
   @Column(DataType.BIGINT)
   tip: number;
-
 }

@@ -1,12 +1,19 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { CELLS_REPOSITORY, SYNCSTAT_REPOSITORY, BLOCKS_REPOSITORY, DAO_TYPE_ID, GENESIS_BLOCK_TIMESTAMP, MILLISECONDS_IN_YEAR } from 'src/util/constant';
+import {
+  CELLS_REPOSITORY,
+  SYNCSTAT_REPOSITORY,
+  BLOCKS_REPOSITORY,
+  DAO_TYPE_ID,
+  GENESIS_BLOCK_TIMESTAMP,
+  MILLISECONDS_IN_YEAR,
+} from 'src/util/constant';
 import { Cell } from 'src/cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
 import { Block } from 'src/cell/block.entity';
 import { CkbService } from 'src/ckb/ckb.service';
 import { JSBI } from '@nervosnetwork/ckb-sdk-utils';
-import apc from 'src/util/apc'
-     
+import apc from 'src/util/apc';
+import { LoggerService } from 'nest-logger';
 
 @Injectable()
 export class DaoService {
@@ -15,33 +22,38 @@ export class DaoService {
     @Inject(SYNCSTAT_REPOSITORY) private readonly statModel: typeof SyncStat,
     @Inject(BLOCKS_REPOSITORY) private readonly blockModel: typeof Block,
     private readonly ckbService: CkbService,
+    private readonly logger: LoggerService,
   ) {}
 
   private readonly ckb = this.ckbService.getCKB();
 
+  /**
+   * returns dao cells by lock script hash
+   * @param lockHash lock script hash
+   */
   async getDaoCells(lockHash) {
-
     const condition = {
-        typeId: DAO_TYPE_ID,
-        isLive: true,
+      typeId: DAO_TYPE_ID,
+      isLive: true,
     };
-    if(lockHash){
-      condition['lockId'] = lockHash;
+    if (lockHash) {
+      Object.assign(condition, { lockId: lockHash });
+      // condition['lockId'] = lockHash;
     }
 
-    let cells = await this.cellModel.findAll({
+    const cells = await this.cellModel.findAll({
       where: condition,
       order: [['id', 'desc']],
     });
 
-    let daoCells = [];
-    for (let cell of cells) {
-      let { hash, idx, size, lockId, blockNumber } = cell;
+    const daoCells = [];
+    for (const cell of cells) {
+      const { hash, idx, size, lockId, blockNumber } = cell;
       let type = 'deposit';
       let depositBlockNumber = blockNumber;
       let withdrawBlockNumber = null;
 
-      let depsoitCell = await this.cellModel.findOne({
+      const depsoitCell = await this.cellModel.findOne({
         where: {
           hash,
           idx,
@@ -53,16 +65,19 @@ export class DaoService {
 
       if (depsoitCell) {
         type = 'withdraw';
-        let dCell = await this.cellModel.findByPk(depsoitCell.rId);
+        const dCell = await this.cellModel.findByPk(depsoitCell.rId);
         depositBlockNumber = dCell.blockNumber;
         withdrawBlockNumber = blockNumber;
       }
 
       if (!withdrawBlockNumber) {
-        let tip = await this.statModel.findOne({});
+        const tip = await this.statModel.findOne({});
         withdrawBlockNumber = tip.tip;
       }
-      console.log('blockNumber', depositBlockNumber, withdrawBlockNumber)
+      this.logger.info(
+        `depositBlockNumber = [${depositBlockNumber}], withdrawBlockNumber = [${withdrawBlockNumber}]`,
+        DaoService.name,
+      );
       const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
       const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
 
@@ -84,7 +99,7 @@ export class DaoService {
       };
 
       const withdrawBlockHeader =
-        type == 'withdraw'
+        type === 'withdraw'
           ? {
               hash: withdrawBlock.hash,
               number: withdrawBlock.number,
@@ -111,68 +126,86 @@ export class DaoService {
     return daoCells;
   }
 
-
-  parseDao(dao){
+  /**
+   * parse dao from block header, and return {totalIssued, accumulateRate, totalUnissued, occupiedCapacity}
+   * @param dao dao of block header
+   */
+  parseDao(dao) {
     const { BigInt } = JSBI;
-    
-    const fromHexInLittleEndian = (str) =>{
 
-        return '0x'+str.match(/../g).reverse().join('');
+    const fromHexInLittleEndian = str => {
+      return (
+        '0x' +
+        str
+          .match(/../g)
+          .reverse()
+          .join('')
+      );
+    };
 
-    }
-    
-    let daoHex = dao.replace('0x', '');
+    const daoHex = dao.replace('0x', '');
 
-    const total_issued = BigInt(fromHexInLittleEndian(daoHex.slice(0, 16)));
-    const accumulated_rate = BigInt(fromHexInLittleEndian(daoHex.slice(16, 32)));
-    const total_unissued = BigInt(fromHexInLittleEndian(daoHex.slice(32, 48)));
-    const occupied_capacity = BigInt(fromHexInLittleEndian(daoHex.slice(48, 64)));
+    const totalIssued = BigInt(fromHexInLittleEndian(daoHex.slice(0, 16)));
+    const accumulatedRate = BigInt(fromHexInLittleEndian(daoHex.slice(16, 32)));
+    const totalUnissued = BigInt(fromHexInLittleEndian(daoHex.slice(32, 48)));
+    const occupiedCapacity = BigInt(
+      fromHexInLittleEndian(daoHex.slice(48, 64)),
+    );
 
-    // console.log('dao', { accumulated_rate, total_issued, total_unissued, occupied_capacity })
-
-    return { accumulated_rate, total_issued, total_unissued, occupied_capacity }
-    
-
+    return {
+      accumulatedRate,
+      totalIssued,
+      totalUnissued,
+      occupiedCapacity,
+    };
   }
 
-
-  async calculateDAOProfit(dao, depositBlock, withdrawBlock){
-
-    let { size } = dao;
+  /**
+   * calculate dao profit by deposit info and withdraw info
+   *
+   * @param dao dao size
+   * @param depositBlock deposit block info
+   * @param withdrawBlock withdraw block info
+   */
+  async calculateDAOProfit(dao, depositBlock, withdrawBlock) {
+    const { size } = dao;
     const { add, divide, multiply, subtract, BigInt } = JSBI;
 
-    const occupied_capacity = BigInt(102*10**8);
-    const capacity = subtract(BigInt(size), occupied_capacity);
+    const occupiedCapacity = BigInt(102 * 10 ** 8);
+    const capacity = subtract(BigInt(size), occupiedCapacity);
 
-    const depositRate = this.parseDao(depositBlock.dao).accumulated_rate;
-    const withdrawRate = this.parseDao(withdrawBlock.dao).accumulated_rate;
+    const depositRate = this.parseDao(depositBlock.dao).accumulatedRate;
+    const withdrawRate = this.parseDao(withdrawBlock.dao).accumulatedRate;
 
-    let withdrawCountedCapacity = divide(multiply(capacity, withdrawRate), depositRate);
+    const withdrawCountedCapacity = divide(
+      multiply(capacity, withdrawRate),
+      depositRate,
+    );
 
-    const countedCapacity = add(withdrawCountedCapacity, occupied_capacity).toString();
+    const countedCapacity = add(
+      withdrawCountedCapacity,
+      occupiedCapacity,
+    ).toString();
 
-    let timeDuration = withdrawBlock.timestamp - depositBlock.timestamp;
-    console.log('rate', depositRate.toString(10), withdrawRate.toString(10));
-    console.log('timeDruation is ', timeDuration);
-    // const rateBI = divide(
-    //   subtract(
-    //     divide(
-    //       multiply(withdrawRate, BigInt(365 * 24 * 3600 * 10000000)),
-    //       depositRate,
-    //     ),
-    //     BigInt(365 * 24 * 3600 * 10000000),
-    //   ),
-    //   BigInt(timeDuration),
-    // );
-    // const rate = Number(rateBI.toString())/10000;
+    const timeDuration = withdrawBlock.timestamp - depositBlock.timestamp;
 
-    const startYearNumber = (+depositBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
-    const endYearNumber = (+withdrawBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) / MILLISECONDS_IN_YEAR
+    this.logger.info(
+      `depositRate = [${depositRate.toString(
+        10,
+      )}], withdrawRate = [${withdrawRate.toString(10)}]`,
+      DaoService.name,
+    );
+    this.logger.info(`timeDruation = [${timeDuration}]`, DaoService.name);
 
-    const rate = apc({startYearNumber, endYearNumber});
+    const startYearNumber =
+      (+depositBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) /
+      MILLISECONDS_IN_YEAR;
+    const endYearNumber =
+      (+withdrawBlock.timestamp - +(GENESIS_BLOCK_TIMESTAMP || 0)) /
+      MILLISECONDS_IN_YEAR;
 
-    return {rate, countedCapacity};
+    const rate = apc({ startYearNumber, endYearNumber });
 
-
+    return { rate, countedCapacity };
   }
 }

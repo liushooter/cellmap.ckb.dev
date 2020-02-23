@@ -1,20 +1,21 @@
-import { AddressType, bech32Address, fullPayloadToAddress, } from '@nervosnetwork/ckb-sdk-utils';
-import { BLOCK_ASSEMBLER_CODE, ETH_LOCK_CODE } from './constant';
+import {
+  AddressType,
+  bech32Address,
+  fullPayloadToAddress,
+} from '@nervosnetwork/ckb-sdk-utils';
+import { BLOCK_ASSEMBLER_CODE } from './constant';
 
+export const getCellAddress = (cell, prefix, ETH_LOCK_TYPE_ID) => {
+  const { lockArgs, lockType, lockCode } = cell;
 
+  const type =
+    lockType === 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
 
-export const getCellAddress = (cell, prefix) => {
-  let { lockArgs, lockType, lockCode } = cell;
-
-  console.log('lockCode', lockCode, lockType)
-  let type =
-    lockType == 'type' ? AddressType.TypeCodeHash : AddressType.DataCodeHash;
-
-  if (lockCode === ETH_LOCK_CODE && lockType == 'type') {
+  if (lockCode === ETH_LOCK_TYPE_ID && lockType === 'type') {
     return lockArgs;
   }
 
-  if (lockCode === BLOCK_ASSEMBLER_CODE && lockType == 'type') {
+  if (lockCode === BLOCK_ASSEMBLER_CODE && lockType === 'type') {
     return bech32Address(lockArgs, {
       prefix,
       type: AddressType.HashIdx,
@@ -30,48 +31,51 @@ export const getCellAddress = (cell, prefix) => {
   });
 };
 
+export const uniqArray = array => {
+  const res = [array[0]];
+  for (const item of array) {
+    // 每次从原数组取一个
 
-export const uniqArray = function(array) {
-  let res = [ array[0] ];
-  for (let i = 1; i < array.length; i++) { // 每次从原数组取一个
-      let matched = false;
-      for (let j = 0; j < res.length; j++) { // 将这个元素与res中每个元素对比
-          if (array[i] == res[j]) { // 若匹配成功，打断第i次的内部循环
-              matched = true;
-              break;
-          }
+    let matched = false;
+    for (const resItem of res) {
+      // 将这个元素与res中每个元素对比
+      if (item === resItem) {
+        // 若匹配成功，打断第i次的内部循环
+        matched = true;
+        break;
       }
-      /* 注意这里逻辑，不能用else，否则将多将很多元素放入res */
-      if (!matched) { // 若匹配不成功，将该元素放入res
-          res.push(array[i]);
-      }
+    }
+    /* 注意这里逻辑，不能用else，否则将多将很多元素放入res */
+    if (!matched) {
+      // 若匹配不成功，将该元素放入res
+      res.push(item);
+    }
   }
   return res;
 };
 
-
-export const hex_data_occupied_bytes = hex_string => {
+export const hexDataOccupiedBytes = hexString => {
   // Exclude 0x prefix, and every 2 hex digits are one byte
-  return (hex_string.length - 2) / 2;
+  return (hexString.length - 2) / 2;
 };
 
-export const script_occupied_bytes = (script) => {
+export const scriptOccupiedBytes = script => {
   if (script !== undefined && script !== null) {
     return (
       1 +
-      hex_data_occupied_bytes(script.codeHash) +
-      hex_data_occupied_bytes(script.args)
-      //   script.args.map(hex_data_occupied_bytes).reduce((x, y) => x + y, 0)
+      hexDataOccupiedBytes(script.codeHash) +
+      hexDataOccupiedBytes(script.args)
+      //   script.args.map(hexDataOccupiedBytes).reduce((x, y) => x + y, 0)
     );
   }
   return 0;
-}
+};
 
-export const cell_occupied_bytes = (cell) => {
+export const cellOccupiedBytes = cell => {
   return (
     8 +
-    hex_data_occupied_bytes(cell.data) +
-    script_occupied_bytes(cell.lock) +
-    script_occupied_bytes(cell.type)
+    hexDataOccupiedBytes(cell.data) +
+    scriptOccupiedBytes(cell.lock) +
+    scriptOccupiedBytes(cell.type)
   );
-}
+};
