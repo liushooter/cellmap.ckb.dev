@@ -6,6 +6,9 @@ import { CkbModule } from './ckb/ckb.module';
 import { DaoModule } from './dao/dao.module';
 import { ConfigModule } from './config/config.module';
 import { LoggerModule } from './logger/logger.module';
+import { ExchangeController } from './exchange/exchange.controller';
+import { ExchangeService } from './exchange/exchange.service';
+import { ExchangeModule } from './exchange/exchange.module';
 
 @Module({
   imports: [
@@ -16,6 +19,7 @@ import { LoggerModule } from './logger/logger.module';
     CellModule,
     CkbModule,
     DaoModule,
+    ExchangeModule,
   ],
 })
 export class AppModule {}

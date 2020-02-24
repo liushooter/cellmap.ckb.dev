@@ -3,6 +3,7 @@ import { Block } from '../cell/block.entity';
 import { Cell } from '../cell/cell.entity';
 import { SyncStat } from 'src/block/syncstat.entity';
 import { ConfigService } from '../config/config.service';
+import { EthTransfer } from 'src/exchange/ethtransfer.entity';
 
 export const databaseProviders = [
   {
@@ -17,7 +18,7 @@ export const databaseProviders = [
         database: config.get('DATABASE_NAME'),
         logging: config.get('SEQUELIZE_ENABLE_LOGGING') === 'true',
       });
-      sequelize.addModels([Cell, Block, SyncStat]);
+      sequelize.addModels([Cell, Block, SyncStat, EthTransfer]);
       await sequelize.sync({ force: false });
       return sequelize;
     },
