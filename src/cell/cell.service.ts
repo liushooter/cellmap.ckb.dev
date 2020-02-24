@@ -366,6 +366,22 @@ export class CellService {
   }
 
   /**
+   * returns MultiSignature Cell for CKB transaction
+   */
+  async loadMultiSigCell() {
+    const cell1 = await this.cellModel.findOne({
+      where: { blockNumber: 0, txIndex: 1 },
+    });
+    const cell2 = await this.cellModel.findOne({
+      where: { blockNumber: 0, txIndex: 0, idx: 4 },
+    });
+    return {
+      hashType: 'type',
+      codeHash: cell2.typeId,
+      outPoint: { txHash: cell1.hash, index: '0x1' },
+    };
+  }
+  /**
    * returns Dao Cell for DAO transaction
    */
   async loadDaoCell() {

@@ -69,6 +69,11 @@ export class CellController {
     return this.cellService.loadSecp256k1Cell();
   }
 
+  @Get('loadMultiSigCell')
+  async getMultiSigCell() {
+    return this.cellService.loadMultiSigCell();
+  }
+
   @Get('getConfig')
   async getConfig() {
     const keccakCodeHash = this.config.ETH_LOCK_TYPE_ID;
