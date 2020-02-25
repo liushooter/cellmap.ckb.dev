@@ -78,7 +78,7 @@ export class CellController {
   async getConfig() {
     const keccakCodeHash = this.config.ETH_LOCK_TYPE_ID;
     const keccakTxHash = this.config.ETH_LOCK_TX_HASH;
-    const cellDeps = await this.cellService.getEthDeps(keccakCodeHash);
+    const cellDeps = await this.cellService.getEthDeps(keccakTxHash);
 
     const startYearNumber =
       (+new Date().getTime() - +(GENESIS_BLOCK_TIMESTAMP || 0)) /
