@@ -37,8 +37,7 @@ export class CellController {
       capacity,
       lastId,
     );
-    const formatedCells = cells.map(cell => this.formatCell(cell));
-    return formatedCells;
+    return cells;
   }
 
   @Get('txList')
@@ -98,48 +97,5 @@ export class CellController {
   @Get('getCapacityByLockHash')
   async getCapacityByLockHash(@Query('lockHash') lockHash) {
     return await this.cellService.getCapacityByLockHash(lockHash);
-  }
-
-  formatCell(cell) {
-    const blockHash = '';
-
-    const {
-      hash,
-      idx,
-      lockCode,
-      dataLen,
-      lockType,
-      lockArgs,
-      cellbase,
-      id,
-      typeId,
-      typeCode,
-      typeType,
-      typeArgs,
-      size,
-    } = cell;
-    const lock = { codeHash: lockCode, hashType: lockType, args: lockArgs };
-    const outPoint = { txHash: hash, index: '0x' + idx.toString(16) };
-    const outputDataLen = '0x' + dataLen.toString(16);
-
-    const type =
-      typeId === ''
-        ? null
-        : { codeHash: typeCode, hashType: typeType, args: typeArgs };
-    const dataHash = EMPTY_HASH;
-
-    const status = 'live';
-    return {
-      id,
-      blockHash,
-      lock,
-      outPoint,
-      outputDataLen,
-      capacity: size,
-      cellbase,
-      type,
-      dataHash,
-      status,
-    };
   }
 }

@@ -29,19 +29,22 @@ export class EthTransfer extends Model<EthTransfer> {
   @Column(DataType.STRING)
   to: string;
 
-  @Column(DataType.TINYINT)
-  currency: number;
+  @Column(DataType.STRING)
+  currency: string;
 
   @Column(DataType.DECIMAL(60, 0))
   amount: number;
 
+  @Column(DataType.INTEGER)
+  confirmations: number;
+
   @Column(DataType.BIGINT)
   transferTime: number;
 
-  @Column(DataType.DECIMAL(20, 20))
+  @Column(DataType.DECIMAL(50, 10))
   currencyPrice: number;
 
-  @Column(DataType.DECIMAL(20, 20))
+  @Column(DataType.DECIMAL(50, 10))
   ckbPrice: number;
 
   @Column(DataType.DECIMAL(60, 0))

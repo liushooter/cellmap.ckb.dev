@@ -266,8 +266,8 @@ export class CellService {
   async pickLiveCellForTransfer(
     lockHash: string,
     totalCapacity: string,
-    lastId: number,
-  ): Promise<Cell[]> {
+    lastId?: number,
+  ): Promise<any[]> {
     const { add, BigInt, greaterThan, lessThan } = this.ckb.utils.JSBI;
 
     const condition = {
@@ -329,19 +329,20 @@ export class CellService {
       offset += 1000;
     }
 
-    return selectedCells;
+    const formatedCells = selectedCells.map(cell => this.formatCell(cell));
+    return formatedCells;
   }
 
   /**
    * returns celldeps for CKB transaction
    * @param keccakTxHash
    */
-  async getEthDeps(keccakTxHash) {
+  async getEthDeps(keccakTxHash): Promise<CKBComponents.CellDep[]> {
     const cell = await this.cellModel.findOne({
       where: { blockNumber: 0, txIndex: 0, idx: 1 },
     });
 
-    const deps = [
+    const deps: CKBComponents.CellDep[] = [
       { depType: 'code', outPoint: { txHash: cell.hash, index: '0x3' } },
       { depType: 'code', outPoint: { txHash: keccakTxHash, index: '0x0' } },
     ];
@@ -351,7 +352,7 @@ export class CellService {
   /**
    * returns Secp256k1 Cell for CKB transaction
    */
-  async loadSecp256k1Cell() {
+  async loadSecp256k1Cell(): Promise<DepCellInfo> {
     const cell1 = await this.cellModel.findOne({
       where: { blockNumber: 0, txIndex: 1 },
     });
@@ -538,6 +539,23 @@ export class CellService {
     return fullTxs;
   }
 
+  async getTxByHash(txHash: string) {
+    if (!txHash || txHash.length !== 66) {
+      return null;
+    }
+
+    const cells = await this.cellModel.findAll({
+      where: {
+        hash: txHash,
+      },
+      order: [['idx', 'asc']],
+    });
+
+    const inputs = cells.filter(cell => cell.direction === false);
+    const outputs = cells.filter(cell => cell.direction === true);
+    return { hash: txHash, inputs, outputs };
+  }
+
   /**
    * calculate transaction type by input cells and output cells
    * if transaction is dao related, return dao-deposit/dao-withdraw1/dao-withdraw2
@@ -625,10 +643,7 @@ export class CellService {
     const inputSize = txInputCells.length;
     const outputSize = txOutputCells.length;
 
-    const prefix =
-      this.ckbService.getChain() === 'ckb'
-        ? AddressPrefix.Mainnet
-        : AddressPrefix.Testnet;
+    const prefix = this.ckbService.getChain();
 
     const from =
       txInputCells.length > 0
@@ -684,5 +699,48 @@ export class CellService {
       where: { lockId: lockHash, typeId: '', isLive: true, direction: true },
     });
     return '0x' + capacity.toString(16);
+  }
+
+  formatCell(cell) {
+    const blockHash = '';
+
+    const {
+      hash,
+      idx,
+      lockCode,
+      dataLen,
+      lockType,
+      lockArgs,
+      cellbase,
+      id,
+      typeId,
+      typeCode,
+      typeType,
+      typeArgs,
+      size,
+    } = cell;
+    const lock = { codeHash: lockCode, hashType: lockType, args: lockArgs };
+    const outPoint = { txHash: hash, index: '0x' + idx.toString(16) };
+    const outputDataLen = '0x' + dataLen.toString(16);
+
+    const type =
+      typeId === ''
+        ? null
+        : { codeHash: typeCode, hashType: typeType, args: typeArgs };
+    const dataHash = EMPTY_HASH;
+
+    const status = 'live';
+    return {
+      id,
+      blockHash,
+      lock,
+      outPoint,
+      outputDataLen,
+      capacity: size,
+      cellbase,
+      type,
+      dataHash,
+      status,
+    };
   }
 }
