@@ -6,6 +6,9 @@ import { CkbModule } from './ckb/ckb.module';
 import { DaoModule } from './dao/dao.module';
 import { ConfigModule } from './config/config.module';
 import { LoggerModule } from './logger/logger.module';
+import { DaoPlusController } from './dao-plus/dao-plus.controller';
+import { DaoPlusService } from './dao-plus/dao-plus.service';
+import { DaoPlusModule } from './dao-plus/dao-plus.module';
 
 @Module({
   imports: [
@@ -16,6 +19,7 @@ import { LoggerModule } from './logger/logger.module';
     CellModule,
     CkbModule,
     DaoModule,
+    DaoPlusModule,
   ],
 })
 export class AppModule {}

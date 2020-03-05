@@ -10,5 +10,6 @@ import { LoggerModule } from 'src/logger/logger.module';
   imports: [DatabaseModule, LoggerModule],
   controllers: [DaoController],
   providers: [DaoService, ...cellsProviders, ...blocksProviders],
+  exports: [DaoService],
 })
 export class DaoModule {}

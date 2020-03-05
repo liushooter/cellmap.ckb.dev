@@ -26,6 +26,22 @@ export class ConfigService {
     return this.envConfig.CKB_RPC_ENDPOINT || 'http://127.0.0.1:8114';
   }
 
+  get KEY_LOCK_TYPE_ID(): string {
+    return this.envConfig.KEY_LOCK_TYPE_ID;
+  }
+
+  get KEY_LOCK_TX_HASH(): string {
+    return this.envConfig.KEY_LOCK_TX_HASH;
+  }
+
+  get UPGRADE_CODE_HASH(): string {
+    return this.envConfig.UPGRADE_CODE_HASH;
+  }
+
+  get UPGRADE_TX_HASH(): string {
+    return this.envConfig.UPGRADE_TX_HASH;
+  }
+
   get serviceName(): string {
     return 'cellmap';
   }

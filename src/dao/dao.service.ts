@@ -48,82 +48,87 @@ export class DaoService {
 
     const daoCells = [];
     for (const cell of cells) {
-      const { hash, idx, size, lockId, blockNumber } = cell;
-      let type = 'deposit';
-      let depositBlockNumber = blockNumber;
-      let withdrawBlockNumber = null;
-
-      const depsoitCell = await this.cellModel.findOne({
-        where: {
-          hash,
-          idx,
-          lockId,
-          typeId: DAO_TYPE_ID,
-          direction: false,
-        },
-      });
-
-      if (depsoitCell) {
-        type = 'withdraw';
-        const dCell = await this.cellModel.findByPk(depsoitCell.rId);
-        depositBlockNumber = dCell.blockNumber;
-        withdrawBlockNumber = blockNumber;
-      }
-
-      if (!withdrawBlockNumber) {
-        const tip = await this.statModel.findOne({});
-        withdrawBlockNumber = tip.tip;
-      }
-      this.logger.info(
-        `depositBlockNumber = [${depositBlockNumber}], withdrawBlockNumber = [${withdrawBlockNumber}]`,
-        DaoService.name,
-      );
-      const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
-      const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
-
-      const { rate, countedCapacity } = await this.calculateDAOProfit(
-        { depositBlockNumber, withdrawBlockNumber, size },
-        depositBlock,
-        withdrawBlock,
-      );
-
-      const depositBlockHeader = {
-        hash: depositBlock.hash,
-        number: depositBlock.number,
-        timestamp: depositBlock.timestamp,
-        epoch: {
-          length: '0x' + Number(depositBlock.epochLength).toString(16),
-          index: '0x' + Number(depositBlock.epochIndex).toString(16),
-          number: '0x' + Number(depositBlock.epochNumber).toString(16),
-        },
-      };
-
-      const withdrawBlockHeader =
-        type === 'withdraw'
-          ? {
-              hash: withdrawBlock.hash,
-              number: withdrawBlock.number,
-              timestamp: withdrawBlock.timestamp,
-              epoch: {
-                length: '0x' + Number(withdrawBlock.epochLength).toString(16),
-                index: '0x' + Number(withdrawBlock.epochIndex).toString(16),
-                number: '0x' + Number(withdrawBlock.epochNumber).toString(16),
-              },
-            }
-          : null;
-      daoCells.push({
-        hash,
-        idx,
-        size,
-        depositBlockHeader,
-        withdrawBlockHeader,
-        type,
-        rate,
-        countedCapacity,
-      });
+      const formatedCell = await this.reformatDaoCell(cell);
+      daoCells.push(formatedCell);
     }
 
     return daoCells;
+  }
+
+  async reformatDaoCell(cell) {
+    const { hash, idx, size, lockId, blockNumber } = cell;
+    let type = 'deposit';
+    let depositBlockNumber = blockNumber;
+    let withdrawBlockNumber = null;
+
+    const depsoitCell = await this.cellModel.findOne({
+      where: {
+        hash,
+        idx,
+        lockId,
+        typeId: DAO_TYPE_ID,
+        direction: false,
+      },
+    });
+
+    if (depsoitCell) {
+      type = 'withdraw';
+      const dCell = await this.cellModel.findByPk(depsoitCell.rId);
+      depositBlockNumber = dCell.blockNumber;
+      withdrawBlockNumber = blockNumber;
+    }
+
+    if (!withdrawBlockNumber) {
+      const tip = await this.statModel.findOne({});
+      withdrawBlockNumber = tip.tip;
+    }
+    this.logger.info(
+      `depositBlockNumber = [${depositBlockNumber}], withdrawBlockNumber = [${withdrawBlockNumber}]`,
+      DaoService.name,
+    );
+    const withdrawBlock = await this.blockModel.findByPk(withdrawBlockNumber);
+    const depositBlock = await this.blockModel.findByPk(depositBlockNumber);
+
+    const { rate, countedCapacity } = await this.calculateDAOProfit(
+      { depositBlockNumber, withdrawBlockNumber, size },
+      depositBlock,
+      withdrawBlock,
+    );
+
+    const depositBlockHeader = {
+      hash: depositBlock.hash,
+      number: depositBlock.number,
+      timestamp: depositBlock.timestamp,
+      epoch: {
+        length: '0x' + Number(depositBlock.epochLength).toString(16),
+        index: '0x' + Number(depositBlock.epochIndex).toString(16),
+        number: '0x' + Number(depositBlock.epochNumber).toString(16),
+      },
+    };
+
+    const withdrawBlockHeader =
+      type === 'withdraw'
+        ? {
+            hash: withdrawBlock.hash,
+            number: withdrawBlock.number,
+            timestamp: withdrawBlock.timestamp,
+            epoch: {
+              length: '0x' + Number(withdrawBlock.epochLength).toString(16),
+              index: '0x' + Number(withdrawBlock.epochIndex).toString(16),
+              number: '0x' + Number(withdrawBlock.epochNumber).toString(16),
+            },
+          }
+        : null;
+    return {
+      hash,
+      idx,
+      size,
+      depositBlockHeader,
+      withdrawBlockHeader,
+      type,
+      rate,
+      countedCapacity,
+    };
   }
 
   /**
