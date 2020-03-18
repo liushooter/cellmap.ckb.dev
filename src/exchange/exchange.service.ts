@@ -34,7 +34,10 @@ export class ExchangeService extends NestSchedule {
     private readonly cellService: CellService,
   ) {
     super();
-    this.etherscanApi = init(this.config.get('ETHERSCAN_TOKEN'));
+    this.etherscanApi = init(
+      this.config.get('ETHERSCAN_TOKEN'),
+      this.config.get('ETH_CHAIN'),
+    );
     this.depositEthAddress = this.config.get('ETH_DEPOSIT_ADDRESS');
 
     this.huobiClient = new huobipro();
@@ -412,5 +415,16 @@ export class ExchangeService extends NestSchedule {
         transferTime,
       };
     });
+  }
+
+  async getConfig() {
+    const tokenList = this.config.tokenList;
+    const chain = this.config.get('ETH_CHAIN');
+
+    return {
+      chain,
+      depositEthAddress: this.depositEthAddress,
+      tokenList,
+    };
   }
 }

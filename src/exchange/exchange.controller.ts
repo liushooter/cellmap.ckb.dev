@@ -13,4 +13,9 @@ export class ExchangeController {
   ): Promise<EthTransfer[]> {
     return await this.exchangeService.getUserTransfers(address);
   }
+
+  @Get('config')
+  async getConfig(): Promise<any> {
+    return await this.exchangeService.getConfig();
+  }
 }
