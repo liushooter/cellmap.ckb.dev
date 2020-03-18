@@ -28,41 +28,46 @@ export class BlockService extends NestSchedule {
    */
   @Interval(5 * 1000)
   async sync() {
-    // if it is syncing data right now, skip starting new sync
-    if (this.syncing) {
-      this.logger.info(
-        `Sync Skipped, current is syncing [${this.syncingBlock}]`,
-        'BLOCK_SYNC',
-      );
-      await this.updateTip(this.syncingBlock);
-      return;
-    }
-
-    this.syncing = true;
-
-    const header = await this.ckb.rpc.getTipHeader();
-    const currentTip = parseInt(header.number, 16);
-    const lastBlock = await this.syncStatModel.findAll();
-    const lastTip = lastBlock.length > 0 ? lastBlock[0].tip : -1;
-
-    if (this.syncingBlock < lastTip) {
-      this.syncingBlock = lastTip;
-    }
-
-    // processing blocks from the last syncing block to the latest block of chain.
-    for (let i = lastTip + 1; i <= currentTip; i++) {
-      await this.cellService.extractFromBlock(i);
-      this.syncingBlock = i;
-      if (i === currentTip) {
+    try {
+      // if it is syncing data right now, skip starting new sync
+      if (this.syncing) {
         this.logger.info(
-          `Synced block from [${lastTip + 1}] to [${currentTip}]`,
+          `Sync Skipped, current is syncing [${this.syncingBlock}]`,
           'BLOCK_SYNC',
         );
+        await this.updateTip(this.syncingBlock);
+        return;
       }
-    }
 
-    await this.updateTip(currentTip);
-    this.syncing = false;
+      this.syncing = true;
+
+      const header = await this.ckb.rpc.getTipHeader();
+      const currentTip = parseInt(header.number, 16);
+      const lastBlock = await this.syncStatModel.findAll();
+      const lastTip = lastBlock.length > 0 ? lastBlock[0].tip : -1;
+
+      if (this.syncingBlock < lastTip) {
+        this.syncingBlock = lastTip;
+      }
+
+      // processing blocks from the last syncing block to the latest block of chain.
+      for (let i = lastTip + 1; i <= currentTip; i++) {
+        await this.cellService.extractFromBlock(i);
+        this.syncingBlock = i;
+        if (i === currentTip) {
+          this.logger.info(
+            `Synced block from [${lastTip + 1}] to [${currentTip}]`,
+            'BLOCK_SYNC',
+          );
+        }
+      }
+
+      await this.updateTip(currentTip);
+      this.syncing = false;
+    } catch (err) {
+      this.logger.error(`execute BLOCK_SYNC task failed ${err}`, 'BLOCK_SYNC');
+      this.syncing = false;
+    }
   }
 
   /**
