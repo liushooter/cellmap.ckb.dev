@@ -18,4 +18,9 @@ export class ExchangeController {
   async getConfig(): Promise<any> {
     return await this.exchangeService.getConfig();
   }
+
+  @Get('tokenRate')
+  async getTokenRate(): Promise<any> {
+    return await this.exchangeService.exchangeRate();
+  }
 }

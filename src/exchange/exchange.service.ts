@@ -63,7 +63,7 @@ export class ExchangeService extends NestSchedule {
   @Interval(15 * 1000)
   async getAssetPrice() {
     const ckbTicker = await this.huobiClient.fetchTicker('CKB/USDT');
-    await this.redisService.getClient().set('ckb_price', ckbTicker.ask);
+    await this.redisService.getClient().set('CKB_price', ckbTicker.ask);
 
     for (const token of this.config.tokenList) {
       if (token.symbol === 'USDT') {
@@ -241,7 +241,7 @@ export class ExchangeService extends NestSchedule {
         await this.redisService.getClient().get(`${token.toLowerCase()}_price`),
       );
       const ckbPrice = Number(
-        await this.redisService.getClient().get('ckb_price'),
+        await this.redisService.getClient().get('CKB_price'),
       );
       const ckbAmount = this.calculateExchangeAssets(
         18,
@@ -426,5 +426,19 @@ export class ExchangeService extends NestSchedule {
       depositEthAddress: this.depositEthAddress,
       tokenList,
     };
+  }
+
+  async exchangeRate() {
+    const tokenList = this.config.tokenList;
+
+    const tokenRateList = [];
+    for (const token of tokenList) {
+      const { symbol } = token;
+      const price = await this.redisService.getClient().get(`${symbol}_price`);
+      tokenRateList.push({ symbol, price });
+    }
+    const ckbPrice = await this.redisService.getClient().get(`CKB_price`);
+    tokenRateList.push({ symbol: 'CKB', price: ckbPrice });
+    return tokenRateList;
   }
 }
